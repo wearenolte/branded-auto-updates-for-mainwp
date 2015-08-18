@@ -1,0 +1,14 @@
+{
+    "name": "moxie/wp-post-mark-emails",
+    "description": "Provides a nice function that can be used like wp_mail() to send out emails to using PostMark.",
+    "license": "GPLV2",
+    "authors": [
+        {
+            "name": "Moxie",
+            "email": "developer@getmoxied.net"
+        }
+    ],
+    "require": {
+        "wildbit/postmark-php": "dev-master" 
+    }
+}

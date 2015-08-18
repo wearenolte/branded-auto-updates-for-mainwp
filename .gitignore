@@ -1,0 +1,5 @@
+wpcs/
+vendor/
+node_modules/
+.sass_cache/
+composer.lock

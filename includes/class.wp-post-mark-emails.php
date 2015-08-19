@@ -22,7 +22,15 @@ class WP_Post_Mark_Emails {
 	public static function init() {
 
 	    // ALWAYS make sure the plugin version is up-to-date.
-	    update_option( wp_post_mark_emails( 'plugin_version' ), GEOIPSL_PLUGIN_VERSION );
+	    update_option( 'wp_post_mark_emails_plugin_version', WP_POST_MARK_EMAILS_PLUGIN_VERSION );
+
+	    // Initialize configuration options.
+	    add_option( 'wp_post_mark_emails_config_enable_post_mark', '' );
+	    add_option( 'wp_post_mark_emails_config_server_token', '' );
+	    add_option( 'wp_post_mark_emails_config_signature', '' );
+	    add_option( 'wp_post_mark_emails_config_template_id', '' );
+
+	    ob_start();
   	}
 
 	/**

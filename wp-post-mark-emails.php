@@ -1,5 +1,8 @@
 <?php
 
+ini_set('display_errors',1);
+ini_set('display_startup_errors',1);
+error_reporting(-1);
 /*
 Plugin Name: WP Post Mark Emails
 Description: Provides a nice function that can be used like wp_mail() to send out emails to using PostMark.
@@ -37,13 +40,14 @@ if ( ! function_exists( 'add_action' ) && ! function_exists( 'add_filter' ) ) {
 
 define( 'WP_POST_MARK_EMAILS', plugin_basename( __FILE__ ) );
 define( 'WP_POST_MARK_EMAILS_PREFIX', 'wp_post_mark_emails_' );
-define( 'WP_POST_MARK_EMAILS_PREFIX_PLUGIN_VERSION', '0.1.0' );
+define( 'WP_POST_MARK_EMAILS_PLUGIN_VERSION', '0.1.0' );
 define( 'WP_POST_MARK_EMAILS_WP_VERSION', '4.2.3' );
 define( 'WP_POST_MARK_EMAILS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WP_POST_MARK_EMAILS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
 require_once('vendor/autoload.php');
 require_once('includes/vars.php');
+require_once('includes/class.wp-post-mark-emails.php');
 require_once('admin/admin.php');
 
 register_activation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'maybe_deactivate' ) );

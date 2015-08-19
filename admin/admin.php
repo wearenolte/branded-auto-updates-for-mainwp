@@ -16,8 +16,7 @@ function wp_post_mark_emails_add_plugin_pages( ) {
     'manage_options',
     WP_POST_MARK_EMAILS_PLUGIN_DIR,
     'wp_post_mark_emails_create_plugin_menu_page',
-    '',
-    1
+    'dashicons-email'
   );
 }
 

@@ -42,7 +42,9 @@ define( 'WP_POST_MARK_EMAILS_WP_VERSION', '4.2.3' );
 define( 'WP_POST_MARK_EMAILS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WP_POST_MARK_EMAILS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
-require_once('./vendor/autoload.php');
+require_once('vendor/autoload.php');
+require_once('includes/vars.php');
+require_once('admin/admin.php');
 
 register_activation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'maybe_deactivate' ) );
 register_activation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'maybe_update' ) );

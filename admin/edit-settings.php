@@ -61,16 +61,14 @@ if ( $do_action ) {
 
 	switch ( $do_action ) {
 		case 'wp_post_mark_emails_config_save':
-			$enable_postmark = isset( $_REQUEST['enable_postmark'] ) ? (bool) $_REQUEST['enable_postmark'] : FALSE;
+			$enable_postmark 	= isset( $_REQUEST['enable_postmark'] ) ? (bool) $_REQUEST['enable_postmark'] : FALSE;
+			$server_token 		= isset( $_REQUEST['server_token'] ) ? (string) $_REQUEST['server_token'] : FALSE;
+			$sender_signature 	= isset( $_REQUEST['sender_signature'] ) ? (string) $_REQUEST['sender_signature'] : FALSE;
+			$template 			= isset( $_REQUEST['template'] ) ? (int) $_REQUEST['template'] : FALSE;
+			
 			update_option( 'wp_post_mark_emails_config_enable_post_mark', $enable_postmark );
-
-			$server_token = isset( $_REQUEST['server_token'] ) ? (string) $_REQUEST['server_token'] : FALSE;
 			update_option( 'wp_post_mark_emails_config_server_token', $server_token );
-
-			$sender_signature = isset( $_REQUEST['sender_signature'] ) ? (string) $_REQUEST['sender_signature'] : FALSE;
 			update_option( 'wp_post_mark_emails_config_signature', $sender_signature );
-
-			$template = isset( $_REQUEST['template'] ) ? (int) $_REQUEST['template'] : FALSE;
 			update_option( 'wp_post_mark_emails_config_template_id', $template );
 
 			$query_args = array(
@@ -82,9 +80,21 @@ if ( $do_action ) {
 			
 			$send_back = remove_query_arg( $query_args, $send_back );
 
-			$query_args = array(
-				'success' => 1,
-			);
+			$query_args = array();
+
+			if ( ! $server_token || ! $sender_signature ) {
+				update_option( 'wp_post_mark_emails_config_enable_post_mark', FALSE );
+
+				if ( $enable_postmark ) {
+					$query_args = array(
+						'options_action' => 'post_mark_disabled',
+					);
+				}
+			} else {
+				$query_args = array(
+					'options_action' => 'save',
+				);
+			}
 
 			$send_back = add_query_arg( $query_args, $send_back );
 
@@ -106,11 +116,12 @@ if ( $do_action ) {
 			$send_back = remove_query_arg( $query_args, $send_back );
 
 			$query_args = array(
-				'success' => 1,
+				'options_action' => 'clear_and_save',
 			);
 
 			$send_back = add_query_arg( $query_args, $send_back );
-			
+
+			unset( $query_args );
 			break;
 
 		case 'wp_post_mark_emails_test_send':
@@ -120,33 +131,53 @@ if ( $do_action ) {
 			$server_token 		= get_option( 'wp_post_mark_emails_config_server_token', '' );
 			$sender_signature 	= get_option( 'wp_post_mark_emails_config_signature', '' );
 			$template 			= get_option( 'wp_post_mark_emails_config_template_id', '' );
+			
+			$query_args 				= array();
+			$query_args['test_email']	= urlencode( $test_email );
 
 			if ( $server_token && $sender_signature ) {
 				try {
-					$client = new PostmarkClient( $server_token ); //'dc67bdf2-17bc-4b8f-828b-5af71b0628af'
+					$client = new PostmarkClient( $server_token );
 					$sendResult = $client->sendEmail(
 						$sender_signature, 
 						$test_email, 
-						"Yeh. It's working!",
-						"This is just a friendly 'hello' from your friends at Postmark."
+						__( "Yeh. It's working!", 'wp_post_mark_emails' ),
+						__( "This is just a friendly 'hello' from your friends at Postmark.", 'wp_post_mark_emails' )
 					);
+
+					$query_args['postmark_success'] = base64_encode( json_encode( array(
+						'message' => sprintf( __( 'Email sent to %s', 'wp_post_mark_emails' ), $test_email ),
+					) ) );
 				} catch ( PostmarkException $ex ) {
-					// If client is able to communicate with the API in a timely fashion,
-					// but the message data is invalid, or there's a server error,
-					// a PostmarkException can be thrown.
+					/* 
+					 * If client is able to communicate with the API in a timely fashion,
+					 * but the message data is invalid, or there's a server error,
+					 * a PostmarkException can be thrown.
+					 */
 					echo $ex->httpStatusCode;
 					echo $ex->message;
 					echo $ex->postmarkApiErrorCode;
+
+					if ( '' !== $ex->httpStatusCode || '' !== $ex->message || '' !== $ex->postmarkApiErrorCode ) {
+						$query_args['postmark_exception'] = base64_encode( json_encode( array(
+							'httpStatusCode' 		=> $ex->httpStatusCode,
+							'message' 				=> $ex->message,
+							'postmarkApiErrorCode' 	=> $ex->postmarkApiErrorCode,
+						) ) );
+					}
 				} catch ( Exception $generalException ) {
-					// A general exception is thown if the API
-					// was unreachable or times out.
+					/* 
+					 * A general exception is thown if the API was unreachable or times out. 
+    				 */
+					$query_args['postmark_general_exception'] = base64_encode( json_encode( array(
+						'message' => __( 'API is unreachable or server has timed out.', 'wp_post_mark_emails' ),
+					) ) );
 				}
 			}
 			
-			$query_args = array();
-			$query_args['test_email'] = $test_email;
-			$send_back = add_query_arg( $query_args, $send_back );
-		
+			$send_back = add_query_arg( $query_args, $send_back, $sender_signature, $template );
+			
+			unset( $query_args, $test_email, $server_token);
 			break;
 		
 		default:
@@ -155,6 +186,7 @@ if ( $do_action ) {
 
 	wp_redirect( $send_back );
 	exit;
+
 } elseif ( ! empty( $_REQUEST['_wp_http_referer'] ) ) {
   wp_redirect( remove_query_arg( array( '_wp_http_referer', '_wpnonce' ), wp_unslash( $_SERVER['REQUEST_URI'] ) ) );
   exit;
@@ -163,41 +195,88 @@ if ( $do_action ) {
 // Notification messages.
 $nags = $messages = array();
 
-// Warning messages.
-if ( ! empty( $_REQUEST['notice'] ) ) {
-  if ( 1 === (int) $_REQUEST['notice'] ) {
-  	$nags[] = __( 'Something went wrong.' );
+if ( ! empty( $_REQUEST['options_action'] ) ) {
+  if ( 'save' === $_REQUEST['options_action'] ) {
+  	$messages[] = __( 'Options saved.', 'wp_post_mark_emails' );
   }
+
+  if ( 'clear_and_save' === $_REQUEST['options_action'] ) {
+  	$nags[] = __( 'Options cleared. Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this WP Post Mark Emails.', 'wp_post_mark_emails' );
+  }
+} else {
+	if ( '' === get_option( 'wp_post_mark_emails_config_server_token', '' ) && '' === get_option( 'wp_post_mark_emails_config_signature', '' ) ) {
+		$nags[] = __( 'Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this WP Post Mark Emails.', 'wp_post_mark_emails' );
+	}
+}
+
+if ( ! empty( $_REQUEST['postmark_exception'] ) ) {
+	$postmark_exception = strip_tags( wp_unslash( $_REQUEST['postmark_exception'] ) );
+	$postmark_exception = (array) base64_decode( json_decode( preg_replace('/\s+/', '', $postmark_exception ) ) );
+
+	$postmark_exception = wp_parse_args( $postmark_exception, array(
+		'httpStatusCode' 		=> '',
+		'message' 				=> '',
+		'postmarkApiErrorCode' 	=> '',
+	) );
+
+	$message 				= $postmark_exception['message'];
+	$postmarkApiErrorCode 	= '<code>postmarkApiErrorCode</code> : ' . $postmark_exception['postmarkApiErrorCode'];
+	$httpStatusCode 		= '<code>httpStatusCode</code>: ' . $postmark_exception['httpStatusCode'];
+
+  	$nags[] = sprintf( __( 'PostMark returned a PostMark Exception: %s. %s, %s', 'wp_post_mark_emails' ), $message, $postmarkApiErrorCode, $httpStatusCode );
+
+  	unset( $message, $postmarkApiErrorCode, $httpStatusCode );
+}
+
+if ( ! empty( $_REQUEST['postmark_success'] ) ) {
+  	$postmark_success = strip_tags( wp_unslash( $_REQUEST['postmark_success'] ) );
+	$postmark_success = (array) json_decode( base64_decode( preg_replace('/\s+/', '', $postmark_success ) ) );
+	
+	$postmark_success = wp_parse_args( $postmark_success, array(
+		'message' 				=> '',
+	) );
+
+	$messages[] = $postmark_success['message'];
+
+	unset( $postmark_success );
 }
 
 // Success messages.
-if ( ! empty( $_REQUEST['success'] ) ) {
-  if ( 1 === (int) $_REQUEST['success'] ) {
-  	$messages[] = __( 'Options saved.' );
-  }
+if ( ! empty( $_REQUEST['postmark_general_exception'] ) ) {
+  	$postmark_general_exception = strip_tags( wp_unslash( $_REQUEST['postmark_general_exception'] ) );
+	$postmark_general_exception = (array) json_decode( base64_decode( preg_replace('/\s+/', '', $postmark_general_exception ) ) );
+	
+	$postmark_general_exception = wp_parse_args( $postmark_general_exception, array(
+		'message' 				=> '',
+	) );
+
+	$nags[] = $postmark_general_exception['message'];
+
+	unset( $postmark_general_exception );
 }
 
+// Print out any warning messages we have.
 if ( ! empty( $nags ) ) {
 	foreach ( $nags as  $nag ) {
 	  echo '<div class="update-nag">' . $nag . '</div>';
 	}	
 }
 
+// Print out any other messages that we have aside from warnings.
 if ( ! empty( $messages ) ) {
 	foreach ( $messages as $message ) {
 	  echo '<div class="updated">' . wpautop( $message ) . '</div>';
 	}
 }
-
 ?>
 
 <div class="wrap">
-	<h2><?php _e( 'WP Post Mark Emails', 'wp_post_mark_emails' ); ?></h2>
+	<h2>WP Post Mark Emails</h2>
 
 	<h2 class="nav-tab-wrapper">
 	<?php
 		foreach ( $navigation_tabs as  $navigation_tab ) { ?>
-		<a href="<?php echo $navigation_tab['href']; ?>" class="<?php esc_attr_e( $navigation_tab['class'] ); ?>"><?php esc_html_e( $navigation_tab['text'] ); ?></a><?php
+			<a href="<?php echo $navigation_tab['href']; ?>" class="<?php esc_attr_e( $navigation_tab['class'] ); ?>"><?php esc_html_e( $navigation_tab['text'] ); ?></a><?php
 		}
 	?>
 	</h2>

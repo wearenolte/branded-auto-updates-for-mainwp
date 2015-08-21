@@ -138,14 +138,40 @@ if ( $do_action ) {
 			if ( $server_token && $sender_signature ) {
 				try {
 					$client = new PostmarkClient( $server_token );
-					$sendResult = $client->sendEmail(
-						$sender_signature, 
-						$test_email, 
-						__( "Yeh. It's working!", 'wp_post_mark_emails' ),
-						__( "This is just a friendly 'hello' from your friends at Postmark.", 'wp_post_mark_emails' )
-					);
 
-					$query_args['postmark_success'] = base64_encode( json_encode( array(
+					if ( $template ) {
+						$temlate_model = new stdClass();
+						$temlate_model->plugins_update = array(
+							array( 'name' => 'Sample Plugin Update 1' ),
+							array( 'name' => 'Sample Plugin Update 1' ),
+						);
+
+						$temlate_model->themes_update = array(
+							array( 'name' => 'Sample Theme Update 1' ),
+							array( 'name' => 'Sample Theme Update 2' ),
+						);
+
+						$temlate_model->core_update = array(
+							array( 'name' => 'Sample Core Update 1' ),
+							array( 'name' => 'Sample Core Update 2' ),
+						);
+
+						$sendResult = $client->sendEmailWithTemplate(
+							$sender_signature, 
+							$test_email, 
+							$template,
+							$temlate_model
+						);
+					} else {
+						$sendResult = $client->sendEmail(
+							$sender_signature, 
+							$test_email, 
+							__( "Yeh. It's working!", 'wp_post_mark_emails' ),
+							__( "This is just a friendly 'hello' from your friends at Postmark.", 'wp_post_mark_emails' )
+						);
+					}
+
+ 					$query_args['postmark_success'] = base64_encode( json_encode( array(
 						'message' => sprintf( __( 'Email sent to %s', 'wp_post_mark_emails' ), $test_email ),
 					) ) );
 				} catch ( PostmarkException $ex ) {

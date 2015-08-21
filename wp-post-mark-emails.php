@@ -1,8 +1,5 @@
 <?php
 
-ini_set('display_errors',1);
-ini_set('display_startup_errors',1);
-error_reporting(-1);
 /*
 Plugin Name: WP Post Mark Emails
 Description: Provides a nice function that can be used like wp_mail() to send out emails to using PostMark.
@@ -34,8 +31,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 if ( ! function_exists( 'add_action' ) && ! function_exists( 'add_filter' ) ) {
-  echo "Hi there!  I'm just a plugin, not much I can do when called directly.";
-  exit;
+	echo "Hi there!  I'm just a plugin, not much I can do when called directly.";
+	exit;
 }
 
 define( 'WP_POST_MARK_EMAILS', plugin_basename( __FILE__ ) );
@@ -45,10 +42,13 @@ define( 'WP_POST_MARK_EMAILS_WP_VERSION', '4.2.3' );
 define( 'WP_POST_MARK_EMAILS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WP_POST_MARK_EMAILS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
-require_once('vendor/autoload.php');
-require_once('includes/vars.php');
-require_once('includes/class.wp-post-mark-emails.php');
-require_once('admin/admin.php');
+// Autoload Composer modules. This will have to be replaced later.
+require_once( 'vendor/autoload.php' );
+
+require_once( 'includes/vars.php' );
+require_once( 'includes/class.wp-post-mark-emails.php' );
+require_once( 'includes/notifications.php' );
+require_once( 'admin/admin.php' );
 
 register_activation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'maybe_deactivate' ) );
 register_activation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'maybe_update' ) );

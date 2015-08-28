@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  *
- * @package WP_Post_Mark_Emails
+ * @package Branded_Auto_Updates_For_MainWP
  */
 
 if ( ! function_exists( 'add_action' ) && ! function_exists( 'add_filter' ) ) {

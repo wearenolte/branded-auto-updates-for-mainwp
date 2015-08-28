@@ -1,19 +1,19 @@
 <?php
 
 /*
-Plugin Name: WP Post Mark Emails
-Description: Provides a nice function that can be used like wp_mail() to send out emails to using PostMark.
-Version: 0.1.0
+Plugin Name: Branded Auto Updates for MainWP
+Description: Automatically upgrade different groups of sites on a daily or weekly basis, and send a branded email notification to multiple recipients afterward.
+Version: 0.2.0
 Author: Moxie
 Author URI: http://getmoxied.net
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
-Text Domain: wp_post_mark_emails
+Text Domain: branded_auto_updates_for_mainwp
 Domain Path: /languages
 */
 
 /*
-Copyright 2014  Dominique Mariano ( dominique.acpal.mariano@gmail.com )
+Copyright 2015  Dominique Mariano ( dominique.acpal.mariano@gmail.com )
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -35,23 +35,23 @@ if ( ! function_exists( 'add_action' ) && ! function_exists( 'add_filter' ) ) {
 	exit;
 }
 
-define( 'WP_POST_MARK_EMAILS', plugin_basename( __FILE__ ) );
-define( 'WP_POST_MARK_EMAILS_PREFIX', 'wp_post_mark_emails_' );
-define( 'WP_POST_MARK_EMAILS_PLUGIN_VERSION', '0.1.0' );
-define( 'WP_POST_MARK_EMAILS_WP_VERSION', '4.2.3' );
-define( 'WP_POST_MARK_EMAILS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'WP_POST_MARK_EMAILS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP', plugin_basename( __FILE__ ) );
+define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_PREFIX', 'baufm_' );
+define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_VERSION', '0.1.0' );
+define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_WP_VERSION', '4.2.3' );
+define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
 // Autoload Composer modules. This will have to be replaced later.
 require_once( 'vendor/autoload.php' );
 
 require_once( 'includes/vars.php' );
-require_once( 'includes/class.wp-post-mark-emails.php' );
+require_once( 'includes/class.baufm-main.php' );
 require_once( 'includes/notifications.php' );
 require_once( 'admin/admin.php' );
 
-register_activation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'maybe_deactivate' ) );
-register_activation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'maybe_update' ) );
-register_activation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'flush_rules' ) );
-register_deactivation_hook( __FILE__, array( 'WP_Post_Mark_Emails', 'flush_rules' ) );
-add_action( 'init', array( 'WP_Post_Mark_Emails', 'init' ) );
+register_activation_hook( __FILE__, array( 'BAUFM_Main', 'maybe_deactivate' ) );
+register_activation_hook( __FILE__, array( 'BAUFM_Main', 'maybe_update' ) );
+register_activation_hook( __FILE__, array( 'BAUFM_Main', 'flush_rules' ) );
+register_deactivation_hook( __FILE__, array( 'BAUFM_Main', 'flush_rules' ) );
+add_action( 'init', array( 'BAUFM_Main', 'init' ) );

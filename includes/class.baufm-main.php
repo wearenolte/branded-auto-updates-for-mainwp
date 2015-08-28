@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  *
- * @package WP_Post_Mark_Emails
+ * @package Branded_Auto_Updates_For_MainWP
  */
 
 if ( ! function_exists( 'add_action' ) && ! function_exists( 'add_filter' ) ) {
@@ -12,7 +12,7 @@ if ( ! function_exists( 'add_action' ) && ! function_exists( 'add_filter' ) ) {
 	exit;
 }
 
-class WP_Post_Mark_Emails {
+class BAUFM_Main {
 
 	/**
 	 * Initialise the program after everything is ready.
@@ -22,13 +22,13 @@ class WP_Post_Mark_Emails {
 	public static function init() {
 
 	    // ALWAYS make sure the plugin version is up-to-date.
-	    update_option( 'wp_post_mark_emails_plugin_version', WP_POST_MARK_EMAILS_PLUGIN_VERSION );
+	    update_option( 'branded_auto_updates_for_mainwp_plugin_version', BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_VERSION );
 
 	    // Initialize configuration options.
-	    add_option( 'wp_post_mark_emails_config_enable_post_mark', '' );
-	    add_option( 'wp_post_mark_emails_config_server_token', '' );
-	    add_option( 'wp_post_mark_emails_config_signature', '' );
-	    add_option( 'wp_post_mark_emails_config_template_id', '' );
+	    add_option( 'branded_auto_updates_for_mainwp_config_enable_post_mark', '' );
+	    add_option( 'branded_auto_updates_for_mainwp_config_server_token', '' );
+	    add_option( 'branded_auto_updates_for_mainwp_config_signature', '' );
+	    add_option( 'branded_auto_updates_for_mainwp_config_template_id', '' );
 
 	    ob_start();
   	}
@@ -43,15 +43,15 @@ class WP_Post_Mark_Emails {
 
 		global $wp_version;
 
-		load_plugin_textdomain( 'wp_post_mark_emails' );
+		load_plugin_textdomain( 'branded_auto_updates_for_mainwp' );
 
 		require_once( ABSPATH . 'wp-admin/includes/plugin.php' );
 
-		if ( version_compare( $wp_version, wp_post_mark_emails_MINIMUM_WP_VERSION, '<' ) ) {
+		if ( version_compare( $wp_version, branded_auto_updates_for_mainwp_MINIMUM_WP_VERSION, '<' ) ) {
 
-			deactivate_plugins( wp_post_mark_emails_PLUGIN_NAME );
+			deactivate_plugins( branded_auto_updates_for_mainwp_PLUGIN_NAME );
 
-		  	$message = sprintf( esc_html__( 'WP JSON Movies %s requires WordPress %s or higher.', 'wp_post_mark_emails' ), wp_post_mark_emails_PLUGIN_VERSION, wp_post_mark_emails_MINIMUM_WP_VERSION );
+		  	$message = sprintf( esc_html__( 'WP JSON Movies %s requires WordPress %s or higher.', 'branded_auto_updates_for_mainwp' ), branded_auto_updates_for_mainwp_PLUGIN_VERSION, branded_auto_updates_for_mainwp_MINIMUM_WP_VERSION );
 
 	  		wp_die( $message );
 		  	exit;

@@ -1,4 +1,15 @@
 <?php
+/**
+ * The main plugin file
+ *
+ * MainWP extention that give you the ability to automatically upgrade different
+ * groups of sites on a daily or weekly basis, and send a branded email notification
+ * to multiple recipients afterward.
+ *
+ * @since 0.1.0
+ *
+ * @package Branded_Auto_Updates_For_MainWP
+ */
 
 /*
 Plugin Name: Branded Auto Updates for MainWP
@@ -8,7 +19,7 @@ Author: Moxie
 Author URI: http://getmoxied.net
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
-Text Domain: branded_auto_updates_for_mainwp
+Text Domain: baufm
 Domain Path: /languages
 */
 
@@ -35,18 +46,19 @@ if ( ! function_exists( 'add_action' ) && ! function_exists( 'add_filter' ) ) {
 	exit;
 }
 
-define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP', plugin_basename( __FILE__ ) );
-define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_PREFIX', 'baufm_' );
-define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_VERSION', '0.1.0' );
-define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_WP_VERSION', '4.2.3' );
-define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'BAUFM', plugin_basename( __FILE__ ) );
+define( 'BAUFM_PREFIX', 'baufm_' );
+define( 'BAUFM_PLUGIN_VERSION', '0.2.0' );
+define( 'BAUFM_WP_VERSION', '4.2.3' );
+define( 'BAUFM_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'BAUFM_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
 // Autoload Composer modules. This will have to be replaced later.
 require_once( 'vendor/autoload.php' );
 
 require_once( 'includes/vars.php' );
 require_once( 'includes/class.baufm-main.php' );
+require_once( 'includes/class.baufm-updater.php' );
 require_once( 'includes/notifications.php' );
 require_once( 'admin/admin.php' );
 

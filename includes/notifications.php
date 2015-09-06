@@ -3,7 +3,7 @@
 use Postmark\PostmarkClient;
 use Postmark\Models\PostmarkException;
 
-function branded_auto_updates_for_mainwp_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $pluginsToUpdateNow, $themesNewUpdate, $themesToUpdate, $themesToUpdateNow, $coreNewUpdate, $coreToUpdate, $coreToUpdateNow ) {
+function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $pluginsToUpdateNow, $themesNewUpdate, $themesToUpdate, $themesToUpdateNow, $coreNewUpdate, $coreToUpdate, $coreToUpdateNow ) {
 	update_option('shit_150', array(
 		$pluginsNewUpdate,
 		$pluginsToUpdate,
@@ -135,10 +135,10 @@ function branded_auto_updates_for_mainwp_send_emails_after_update( $pluginsNewUp
 			$emails = explode( ',', $emails );
 			MainWPLogger::Instance()->info( var_export( $emails, true ) );
 
-			$server_token 		= get_option( 'branded_auto_updates_for_mainwp_config_server_token', '' );
-			$sender_signature 	= get_option( 'branded_auto_updates_for_mainwp_config_signature', '' );
-			$template 			= (int) get_option( 'branded_auto_updates_for_mainwp_config_template_id', '' );
-			$enable_post_mark  	= (bool) get_option( 'branded_auto_updates_for_mainwp_config_enable_post_mark', FALSE );
+			$server_token 		= get_option( 'baufm_config_server_token', '' );
+			$sender_signature 	= get_option( 'baufm_config_signature', '' );
+			$template 			= (int) get_option( 'baufm_config_template_id', '' );
+			$enable_post_mark  	= (bool) get_option( 'baufm_config_enable_post_mark', FALSE );
 
 			if ( ! empty( $emails ) && is_array( $emails ) ) {
 				foreach ( $emails as $email ) {
@@ -161,7 +161,7 @@ function branded_auto_updates_for_mainwp_send_emails_after_update( $pluginsNewUp
 									$sendResult = $client->sendEmail(
 										$sender_signature, 
 										$email, 
-										$website->name . ' - ' . __( 'Trusted Automated Updates', 'branded_auto_updates_for_mainwp' ),
+										$website->name . ' - ' . __( 'Trusted Automated Updates', 'baufm' ),
 										$body
 									);
 								}
@@ -180,4 +180,4 @@ function branded_auto_updates_for_mainwp_send_emails_after_update( $pluginsNewUp
 		}
 	}
 }
-add_action( 'mainwp_cronupdatecheck_action', 'branded_auto_updates_for_mainwp_send_emails_after_update', 10, 9 );
+add_action( 'mainwp_cronupdatecheck_action', 'baufm_send_emails_after_update', 10, 9 );

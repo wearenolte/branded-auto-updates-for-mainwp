@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin variables
+ * Plugin global variables
  *
  * @since 0.1.0
  *

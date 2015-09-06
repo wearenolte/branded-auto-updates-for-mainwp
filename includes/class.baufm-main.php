@@ -22,13 +22,16 @@ class BAUFM_Main {
 	public static function init() {
 
 	    // ALWAYS make sure the plugin version is up-to-date.
-	    update_option( 'branded_auto_updates_for_mainwp_plugin_version', BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_VERSION );
+	    update_option( 'baufm_plugin_version', BAUFM_PLUGIN_VERSION );
 
 	    // Initialize configuration options.
-	    add_option( 'branded_auto_updates_for_mainwp_config_enable_post_mark', '' );
-	    add_option( 'branded_auto_updates_for_mainwp_config_server_token', '' );
-	    add_option( 'branded_auto_updates_for_mainwp_config_signature', '' );
-	    add_option( 'branded_auto_updates_for_mainwp_config_template_id', '' );
+	    add_option( 'baufm_config_enable_post_mark', '' );
+	    add_option( 'baufm_config_server_token', '' );
+	    add_option( 'baufm_config_signature', '' );
+	    add_option( 'baufm_config_template_id', '' );
+	    
+	    wp_clear_scheduled_hook( 'mainwp_cronupdatescheck_action' );
+	    $baufm_updater = new BAUFM_Updater();
 
 	    ob_start();
   	}
@@ -43,7 +46,7 @@ class BAUFM_Main {
 
 		global $wp_version;
 
-		load_plugin_textdomain( 'branded_auto_updates_for_mainwp' );
+		load_plugin_textdomain( 'baufm' );
 
 		require_once( ABSPATH . 'wp-admin/includes/plugin.php' );
 
@@ -51,7 +54,7 @@ class BAUFM_Main {
 
 			deactivate_plugins( branded_auto_updates_for_mainwp_PLUGIN_NAME );
 
-		  	$message = sprintf( esc_html__( 'WP JSON Movies %s requires WordPress %s or higher.', 'branded_auto_updates_for_mainwp' ), branded_auto_updates_for_mainwp_PLUGIN_VERSION, branded_auto_updates_for_mainwp_MINIMUM_WP_VERSION );
+		  	$message = sprintf( esc_html__( 'WP JSON Movies %s requires WordPress %s or higher.', 'baufm' ), branded_auto_updates_for_mainwp_PLUGIN_VERSION, branded_auto_updates_for_mainwp_MINIMUM_WP_VERSION );
 
 	  		wp_die( $message );
 		  	exit;

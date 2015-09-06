@@ -1,4 +1,13 @@
 <?php
+/**
+ * The main settings file
+ *
+ * This file handles the saving and loading of all other settings files.
+ * 
+ * @since 0.1.0
+ *
+ * @package Branded_Auto_Updates_For_MainWP
+ */
 
 use Postmark\PostmarkClient;
 use Postmark\Models\PostmarkException;
@@ -9,9 +18,10 @@ if ( ! current_user_can( 'manage_options' ) ) {
 
 // All the actions we can do.
 $actions = array(
-  'branded_auto_updates_for_mainwp_config_save',
-  'branded_auto_updates_for_mainwp_config_clear_and_save',
-  'branded_auto_updates_for_mainwp_test_send',
+  'baufm_config_save',
+  'baufm_config_clear_and_save',
+  'baufm_test_send',
+  'baufm_save_site_group_sched',
 );
 
 // Set the action to the first encountered action.
@@ -24,10 +34,10 @@ foreach ( $actions as $action_ ) {
 }
 
 // Set the page default tab.
-$current_tab = 'config';
+$current_tab = 'site-groups';
 
 // If user specified a tab to view, use it.
-if ( isset( $_REQUEST['tab'] ) && in_array( $_REQUEST['tab'] , array( 'config', 'test', 'site-groups' ) ) ) {
+if ( isset( $_REQUEST['tab'] ) && in_array( $_REQUEST['tab'] , array( 'email-config', 'test', 'site-groups' ) ) ) {
 	$current_tab = $_REQUEST['tab'];
 }
 
@@ -41,27 +51,27 @@ $parent_file = 'admin.php?page=branded-auto-updates-for-mainwp';
 
 $navigation_tabs = array(
   array(
-    'href'  => add_query_arg( array( 'tab' => 'config' ) , admin_url( $parent_file ) ),
-    'class' => 'nav-tab ' . ( ( 'config' === $current_tab ) ? 'nav-tab-active' : '' ),
-    'text'  => __( 'Email Service', 'branded_auto_updates_for_mainwp' ),
-  ),
-
-  array(
-    'href'  => add_query_arg( array( 'tab' => 'test' ) , admin_url( $parent_file ) ),
-    'class' => 'nav-tab ' . ( ( 'test' === $current_tab ) ? 'nav-tab-active' : '' ),
-    'text'  => __( 'Email Test', 'branded_auto_updates_for_mainwp' ),
-  ),
-
-  array(
     'href'  => add_query_arg( array( 'tab' => 'site-groups' ) , admin_url( $parent_file ) ),
     'class' => 'nav-tab ' . ( ( 'site-groups' === $current_tab ) ? 'nav-tab-active' : '' ),
-    'text'  => __( 'Site Group Schedule', 'branded_auto_updates_for_mainwp' ),
+    'text'  => __( 'Batch Group Updates', 'baufm' ),
+  ),
+
+  array(
+    'href'  => add_query_arg( array( 'tab' => 'email-config' ) , admin_url( $parent_file ) ),
+    'class' => 'nav-tab ' . ( ( 'email-config' === $current_tab ) ? 'nav-tab-active' : '' ),
+    'text'  => __( 'Email Service', 'baufm' ),
+  ),
+
+  array(
+    'href'  => add_query_arg( array( 'tab' => 'email-test' ) , admin_url( $parent_file ) ),
+    'class' => 'nav-tab ' . ( ( 'email-test' === $current_tab ) ? 'nav-tab-active' : '' ),
+    'text'  => __( 'Email Test', 'baufm' ),
   ),
 );
 
 if ( $do_action ) {
 	
-	$really = check_admin_referer( 'branded_auto_updates_for_mainwp_settings' );
+	$really = check_admin_referer( 'baufm_settings_nonce' );
 	
 	// Construct the send back url.
 	$send_back = remove_query_arg( array_keys( $actions ), wp_get_referer() );
@@ -71,16 +81,16 @@ if ( $do_action ) {
 	}
 
 	switch ( $do_action ) {
-		case 'branded_auto_updates_for_mainwp_config_save':
+		case 'baufm_config_save':
 			$enable_postmark 	= isset( $_REQUEST['enable_postmark'] ) ? (bool) $_REQUEST['enable_postmark'] : FALSE;
 			$server_token 		= isset( $_REQUEST['server_token'] ) ? (string) $_REQUEST['server_token'] : FALSE;
 			$sender_signature 	= isset( $_REQUEST['sender_signature'] ) ? (string) $_REQUEST['sender_signature'] : FALSE;
 			$template 			= isset( $_REQUEST['template'] ) ? (int) $_REQUEST['template'] : FALSE;
 			
-			update_option( 'branded_auto_updates_for_mainwp_config_enable_post_mark', $enable_postmark );
-			update_option( 'branded_auto_updates_for_mainwp_config_server_token', $server_token );
-			update_option( 'branded_auto_updates_for_mainwp_config_signature', $sender_signature );
-			update_option( 'branded_auto_updates_for_mainwp_config_template_id', $template );
+			update_option( 'baufm_config_enable_post_mark', $enable_postmark );
+			update_option( 'baufm_config_server_token', $server_token );
+			update_option( 'baufm_config_signature', $sender_signature );
+			update_option( 'baufm_config_template_id', $template );
 
 			$query_args = array(
 				'enable_postmark',
@@ -94,7 +104,7 @@ if ( $do_action ) {
 			$query_args = array();
 
 			if ( ! $server_token || ! $sender_signature ) {
-				update_option( 'branded_auto_updates_for_mainwp_config_enable_post_mark', FALSE );
+				update_option( 'baufm_config_enable_post_mark', FALSE );
 
 				if ( $enable_postmark ) {
 					$query_args = array(
@@ -111,11 +121,12 @@ if ( $do_action ) {
 
 			unset( $enable_postmark, $server_token, $sender_signature, $template, $query_args );
 			break;
-		case 'branded_auto_updates_for_mainwp_config_clear_and_save':
-			update_option( 'branded_auto_updates_for_mainwp_config_enable_post_mark', '' );
-			update_option( 'branded_auto_updates_for_mainwp_config_server_token', '' );
-			update_option( 'branded_auto_updates_for_mainwp_config_signature', '' );
-			update_option( 'branded_auto_updates_for_mainwp_config_template_id', '' );
+		
+		case 'baufm_config_clear_and_save':
+			update_option( 'baufm_config_enable_post_mark', '' );
+			update_option( 'baufm_config_server_token', '' );
+			update_option( 'baufm_config_signature', '' );
+			update_option( 'baufm_config_template_id', '' );
 			
 			$query_args = array(
 				'enable_postmark',
@@ -135,13 +146,13 @@ if ( $do_action ) {
 			unset( $query_args );
 			break;
 
-		case 'branded_auto_updates_for_mainwp_test_send':
+		case 'baufm_test_send':
 		
 			$test_email = isset( $_REQUEST['test_email'] ) ? (string) $_REQUEST['test_email'] : FALSE;
 
-			$server_token 		= get_option( 'branded_auto_updates_for_mainwp_config_server_token', '' );
-			$sender_signature 	= get_option( 'branded_auto_updates_for_mainwp_config_signature', '' );
-			$template 			= get_option( 'branded_auto_updates_for_mainwp_config_template_id', '' );
+			$server_token 		= get_option( 'baufm_config_server_token', '' );
+			$sender_signature 	= get_option( 'baufm_config_signature', '' );
+			$template 			= get_option( 'baufm_config_template_id', '' );
 			
 			$query_args 				= array();
 			$query_args['test_email']	= urlencode( $test_email );
@@ -181,13 +192,13 @@ if ( $do_action ) {
 						$sendResult = $client->sendEmail(
 							$sender_signature, 
 							$test_email, 
-							__( "Yeh. It's working!", 'branded_auto_updates_for_mainwp' ),
-							__( "This is just a friendly 'hello' from your friends at Postmark.", 'branded_auto_updates_for_mainwp' )
+							__( "Yeh. It's working!", 'baufm' ),
+							__( "This is just a friendly 'hello' from your friends at Postmark.", 'baufm' )
 						);
 					}
 
  					$query_args['postmark_success'] = base64_encode( json_encode( array(
-						'message' => sprintf( __( 'Email sent to %s', 'branded_auto_updates_for_mainwp' ), $test_email ),
+						'message' => sprintf( __( 'Email sent to %s', 'baufm' ), $test_email ),
 					) ) );
 				} catch ( PostmarkException $ex ) {
 					/* 
@@ -211,7 +222,7 @@ if ( $do_action ) {
 					 * A general exception is thown if the API was unreachable or times out. 
     				 */
 					$query_args['postmark_general_exception'] = base64_encode( json_encode( array(
-						'message' => __( 'API is unreachable or server has timed out.', 'branded_auto_updates_for_mainwp' ),
+						'message' => __( 'API is unreachable or server has timed out.', 'baufm' ),
 					) ) );
 				}
 			}
@@ -221,6 +232,27 @@ if ( $do_action ) {
 			unset( $query_args, $test_email, $server_token);
 			break;
 		
+		case 'baufm_save_site_group_sched':
+			$group_id 			= isset( $_REQUEST['group-id'] ) ? (int) $_REQUEST['group-id'] : FALSE;
+			$schedule_in_week 	= isset( $_REQUEST['schedule_in_week'] ) ? (int) $_REQUEST['schedule_in_week'] : FALSE;
+			$schedule_in_day 	= isset( $_REQUEST['schedule_in_day'] ) ? (int) $_REQUEST['schedule_in_day'] : FALSE;
+			$sheduled_action 	= isset( $_REQUEST['sheduled_action'] ) ? (int) $_REQUEST['sheduled_action'] : FALSE;
+
+			update_option( "baufm_schedule_in_week_group_$group_id", $schedule_in_week );
+			update_option( "baufm_schedule_in_day_group_$group_id",	$schedule_in_day );
+			update_option( "baufm_scheduled_action_group_$group_id", $sheduled_action );
+
+			$query_args = array(
+				'schedule_in_week',
+				'schedule_in_day',
+				'sheduled_action',		
+			);
+
+			$send_back = remove_query_arg( $query_args, $send_back );
+
+			unset( $query_args );
+			break;
+
 		default:
 			break;
 	}
@@ -238,15 +270,15 @@ $nags = $messages = array();
 
 if ( ! empty( $_REQUEST['options_action'] ) ) {
   if ( 'save' === $_REQUEST['options_action'] ) {
-  	$messages[] = __( 'Options saved.', 'branded_auto_updates_for_mainwp' );
+  	$messages[] = __( 'Options saved.', 'baufm' );
   }
 
   if ( 'clear_and_save' === $_REQUEST['options_action'] ) {
-  	$nags[] = __( 'Options cleared. Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this WP Post Mark Emails.', 'branded_auto_updates_for_mainwp' );
+  	$nags[] = __( 'Options cleared. Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this WP Post Mark Emails.', 'baufm' );
   }
 } else {
-	if ( '' === get_option( 'branded_auto_updates_for_mainwp_config_server_token', '' ) && '' === get_option( 'branded_auto_updates_for_mainwp_config_signature', '' ) ) {
-		$nags[] = __( 'Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this WP Post Mark Emails.', 'branded_auto_updates_for_mainwp' );
+	if ( '' === get_option( 'baufm_config_server_token', '' ) && '' === get_option( 'baufm_config_signature', '' ) ) {
+		$nags[] = __( 'Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this WP Post Mark Emails.', 'baufm' );
 	}
 }
 
@@ -264,7 +296,7 @@ if ( ! empty( $_REQUEST['postmark_exception'] ) ) {
 	$postmarkApiErrorCode 	= '<code>postmarkApiErrorCode</code> : ' . $postmark_exception['postmarkApiErrorCode'];
 	$httpStatusCode 		= '<code>httpStatusCode</code>: ' . $postmark_exception['httpStatusCode'];
 
-  	$nags[] = sprintf( __( 'PostMark returned a PostMark Exception: %s. %s, %s', 'branded_auto_updates_for_mainwp' ), $message, $postmarkApiErrorCode, $httpStatusCode );
+  	$nags[] = sprintf( __( 'PostMark returned a PostMark Exception: %s. %s, %s', 'baufm' ), $message, $postmarkApiErrorCode, $httpStatusCode );
 
   	unset( $message, $postmarkApiErrorCode, $httpStatusCode );
 }
@@ -312,7 +344,8 @@ if ( ! empty( $messages ) ) {
 ?>
 
 <div class="wrap">
-	<h2>Branded Auto Updates for MainWP</h2>
+	<h2><?php echo sprintf( __( 'Branded Auto Updates for MainWP %s', 'baufm' ), BAUFM_PLUGIN_VERSION ); ?></h2>
+	<p class="description"><?php _e( 'Notify your clients about site updates. <i>With style!</i>', 'baufm' ); ?></p>
 
 	<h2 class="nav-tab-wrapper" style="padding-bottom: 0;">
 	<?php
@@ -322,7 +355,7 @@ if ( ! empty( $messages ) ) {
 	?>
 	</h2>
 
-	<?php require_once( BRANDED_AUTO_UPDATES_FOR_MAINWP_PLUGIN_DIR . 'admin/edit-settings-' . ( ( isset( $current_content ) ) ? $current_content : $current_tab ) . '.php' ); ?>
+	<?php require_once( BAUFM_PLUGIN_DIR . 'admin/edit-settings-' . ( ( isset( $current_content ) ) ? $current_content : $current_tab ) . '.php' ); ?>
 
 	<div id="ajax-response"></div>
 	<br class="clear" />

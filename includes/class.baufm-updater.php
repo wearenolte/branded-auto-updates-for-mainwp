@@ -11,9 +11,6 @@ if ( session_id() == '' ) session_start();
 ini_set( 'display_errors', TRUE );
 error_reporting( E_ALL | E_STRICT );
 
-// @ini_set( 'display_errors', FALSE );
-// @error_reporting( 0 );
-
 class BAUFM_Updater {
     // Singleton
     private static $instance = NULL;
@@ -36,8 +33,7 @@ class BAUFM_Updater {
 
         do_action( 'mainwp_cronload_action' );
 
-
-        add_action( 'baufm_updater_cron_updates_check_action', array($this, 'baufm_updater_cron_updates_check_action' ) );
+        add_action( 'baufm_updater_cron_updates_check_action', array( $this, 'baufm_updater_cron_updates_check_action' ) );
 
         if ( ( $sched = wp_next_scheduled( 'baufm_updater_cron_updates_check_action' ) ) == FALSE) {
             if ( $useWPCron ) {
@@ -48,147 +44,239 @@ class BAUFM_Updater {
         }
     }
 
+    public function get_scheduled_day_of_week( $group_id ) {
+        $schedule_in_week = (int) get_option( "baufm_schedule_in_week_group_$group_id", 0 );
+        
+        $days = array(
+            'Monday',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday',
+            'Sunday',
+        );
+
+        if ( $schedule_in_week > 2 ) {
+            $day = $schedule_in_week - 2;
+            return $days[ $day ];
+        }
+
+        return '';
+    }
+
+    public function get_scheduled_time_of_day( $group_id ) {
+        $schedule_in_day  = get_option( "baufm_schedule_in_day_group_$group_id" );
+        $suffix = ( $schedule_in_day >= 12 ) ? 'PM' : 'AM';
+        $time = ( $schedule_in_day <= 12 ) ? $schedule_in_day : $schedule_in_day - 12;
+        $time   = ( $time < 10 ) ? '0' . $time : $time; 
+        $time = $time . ':00 ' . $suffix . ' ' . date_i18n( 'e' );
+
+        return $time;
+    }
+
+    public function get_last_scheduled_update_for_group( $group_id ) {
+        return get_option( "baufm_last_scheduled_update_$group_id" );
+    }
+
+    public function set_last_scheduled_update_for_group( $group_id, $timestamp ) {
+        update_option( "baufm_last_scheduled_update_$group_id", $timestamp );
+    }
+
     public function baufm_updater_cron_updates_check_action() {
-        MainWPLogger::Instance()->info('CRON :: updates check');
 
-        @ignore_user_abort(TRUE);
-        @set_time_limit(0);
-        $mem =  '512M';
-        @ini_set('memory_limit', $mem);
-        @ini_set('max_execution_time', 0);
+        MainWPLogger::Instance()->info( 'CRON :: updates check' );
 
-        MainWPUtility::update_option('mainwp_cron_last_updatescheck', time());
+        @ignore_user_abort( TRUE );
+        @set_time_limit( 0 );
+        $mem = '512M';
+        @ini_set( 'memory_limit', $mem );
+        @ini_set( 'max_execution_time', 0 );
 
-        $mainwpAutomaticDailyUpdate = get_option('mainwp_automaticDailyUpdate');
+        // Used in MainWPServerInformation.page.php for display purposes only.
+        MainWPUtility::update_option( 'mainwp_cron_last_updatescheck', time() );
+        
+        // Last time we performed an update for ALL groups.
+        $baufm_last_automatic_update_for_all = get_option( 'mainwp_updatescheck_last' );
 
-        $mainwpLastAutomaticUpdate = get_option('mainwp_updatescheck_last');
-        if ($mainwpLastAutomaticUpdate == date('d/m/Y'))
-        {
-            MainWPLogger::Instance()->debug('CRON :: updates check :: already updated today');
+        $site_groups = MainWPDB::Instance()->getNotEmptyGroups();
+
+        // We will only deal with batch, or grouped updates.
+        if ( empty( $site_groups ) ) {
             return;
         }
 
-        $websites = MainWPDB::Instance()->getWebsitesCheckUpdates(4);
-        MainWPLogger::Instance()->debug('CRON :: updates check :: found ' . count($websites) . ' websites');
-
-        $userid = null;
-        foreach ($websites as $website)
-        {
-            $websiteValues = array(
-                'dtsAutomaticSyncStart' => time()
-            );
-            if ($userid == null) $userid = $website->userid;
-
-            MainWPDB::Instance()->updateWebsiteSyncValues($website->id, $websiteValues);
+        // Loop through each site group and check if there is an update to do.
+        foreach ( $site_groups as $group ) {
+            if ( $this->get_scheduled_day_of_week( $group->id ) === date_i18n( 'l' ) ) {
+                if ( date_i18n( 'G' ) >= $this->get_scheduled_time_of_day( $group->id ) ) {
+                    if ( $this->get_last_scheduled_update_for_group( $group->id ) === date_i18n( 'd/m/Y' ) ) {
+                        // No action to take. Already updated.
+                        MainWPLogger::Instance()->debug( 'CRON :: updates check :: already updated today' );
+                        continue;
+                    } else {
+                        // We should proceed with the update.
+                        $current_group = $group;
+                        break;
+                    }
+                }
+            }
         }
 
-        if (count($websites) == 0)
-        {
+        // We don't have a group. No batch update to make.
+        if ( ! isset( $current_group ) ) {
+            return;
+        }
+
+        // The group ID of the current group
+        $group_id = $current_group->id; 
+
+        // Action to take when an update is available: None, email updates, or update sites.
+        $do_what_for_group = get_option( "baufm_automatic_weekly_update_for_group_$group_id" );
+
+        // All updates.
+        $websites = MainWPDB::Instance()->getWebsitesCheckUpdates( 4 );
+        $updates_for_current_group = array();
+        
+        MainWPLogger::Instance()->debug( 'CRON :: updates check :: found ' . count( $websites ) . ' websites' );
+
+        // We will only deal with updates available for a particular group.
+        foreach ( $websites as $website ) {
+            if ( $website->id === $group_id ) {
+                $updates_for_current_group[] = $website;
+            }
+        }
+
+        // Clear variables to free them for later use.
+        unset( $websites, $website );
+
+        // No updates for the current group.
+        if ( 0 === count( $updates_for_current_group ) ) {
+            MainWPLogger::Instance()->debug( 'CRON :: updates check :: no updates for current group' . $group_id );
+            return;
+        }
+
+        $user_id = NULL;
+
+        foreach ( $updates_for_current_group as $website ) {
+            $website_values = array(
+                'dtsAutomaticSyncStart' => time()
+            );
+
+            if ( NULL === $user_id ) {
+                $user_id = $website->userid;
+            }
+
+            MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, $website_values );
+        }
+
+        unset( $website );
+
+        if ( 0 === count( $updates_for_current_group ) ) {
             $busyCounter = MainWPDB::Instance()->getWebsitesCountWhereDtsAutomaticSyncSmallerThenStart();
 
-            if ($busyCounter == 0)
-            {
+            if ( 0 === $busyCounter ) {
                 MainWPLogger::Instance()->debug('CRON :: updates check :: got to the mail part');
 
                 //Send the email & update all to this time!
                 $mail = '';
                 $sendMail = FALSE;
 
-                $sitesCheckCompleted = null;
+                $sites_check_completed = null;
                 if (get_option('mainwp_backup_before_upgrade') == 1)
                 {
-                    $sitesCheckCompleted = get_option('mainwp_automaticUpdate_backupChecks');
-                    if (!is_array($sitesCheckCompleted)) $sitesCheckCompleted = null;
+                    $sites_check_completed = get_option('mainwp_automaticUpdate_backupChecks');
+                    if (!is_array($sites_check_completed)) $sites_check_completed = null;
                 }
 
 
-                $pluginsNewUpdate = get_option('mainwp_updatescheck_mail_update_plugins_new');
-                if (!is_array($pluginsNewUpdate)) $pluginsNewUpdate = array();
-                $pluginsToUpdate = get_option('mainwp_updatescheck_mail_update_plugins');
-                if (!is_array($pluginsToUpdate)) $pluginsToUpdate = array();
-                $ignoredPluginsNewUpdate = get_option('mainwp_updatescheck_mail_ignore_plugins_new');
-                if (!is_array($ignoredPluginsNewUpdate)) $ignoredPluginsNewUpdate = array();
-                $ignoredPluginsToUpdate = get_option('mainwp_updatescheck_mail_ignore_plugins');
-                if (!is_array($ignoredPluginsToUpdate)) $ignoredPluginsToUpdate = array();
+                $plugins_new_update = get_option('mainwp_updatescheck_mail_update_plugins_new');
+                if (!is_array($plugins_new_update)) $plugins_new_update = array();
+                $plugins_to_update = get_option('mainwp_updatescheck_mail_update_plugins');
+                if (!is_array($plugins_to_update)) $plugins_to_update = array();
+                $ignored_plugins_new_update = get_option('mainwp_updatescheck_mail_ignore_plugins_new');
+                if (!is_array($ignored_plugins_new_update)) $ignored_plugins_new_update = array();
+                $ignored_plugins_to_update = get_option('mainwp_updatescheck_mail_ignore_plugins');
+                if (!is_array($ignored_plugins_to_update)) $ignored_plugins_to_update = array();
 
-                if ((count($pluginsNewUpdate) != 0) || (count($pluginsToUpdate) != 0) || (count($ignoredPluginsNewUpdate) != 0) || (count($ignoredPluginsToUpdate) != 0))
+                if ((count($plugins_new_update) != 0) || (count($plugins_to_update) != 0) || (count($ignored_plugins_new_update) != 0) || (count($ignored_plugins_to_update) != 0))
                 {
                     $sendMail = TRUE;
 
                     $mail .= '<div><strong>WordPress Plugin Updates</strong></div>';
                     $mail .= '<ul>';
-                    $mail .= $this->print_updates_array_lines($pluginsNewUpdate, null);
-                    $mail .= $this->print_updates_array_lines($pluginsToUpdate, $sitesCheckCompleted);
-                    $mail .= $this->print_updates_array_lines($ignoredPluginsNewUpdate, null);
-                    $mail .= $this->print_updates_array_lines($ignoredPluginsToUpdate, null);
+                    $mail .= $this->print_updates_array_lines($plugins_new_update, null);
+                    $mail .= $this->print_updates_array_lines($plugins_to_update, $sites_check_completed);
+                    $mail .= $this->print_updates_array_lines($ignored_plugins_new_update, null);
+                    $mail .= $this->print_updates_array_lines($ignored_plugins_to_update, null);
                     $mail .= '</ul>';
                 }
 
-                $themesNewUpdate = get_option('mainwp_updatescheck_mail_update_themes_new');
-                if (!is_array($themesNewUpdate)) $themesNewUpdate = array();
-                $themesToUpdate = get_option('mainwp_updatescheck_mail_update_themes');
-                if (!is_array($themesToUpdate)) $themesToUpdate = array();
-                $ignoredThemesNewUpdate = get_option('mainwp_updatescheck_mail_ignore_themes_new');
-                if (!is_array($ignoredThemesNewUpdate)) $ignoredThemesNewUpdate = array();
-                $ignoredThemesToUpdate = get_option('mainwp_updatescheck_mail_ignore_themes');
-                if (!is_array($ignoredThemesToUpdate)) $ignoredThemesToUpdate = array();
+                $themes_new_update = get_option('mainwp_updatescheck_mail_update_themes_new');
+                if (!is_array($themes_new_update)) $themes_new_update = array();
+                $themes_to_update = get_option('mainwp_updatescheck_mail_update_themes');
+                if (!is_array($themes_to_update)) $themes_to_update = array();
+                $ignored_themes_new_update = get_option('mainwp_updatescheck_mail_ignore_themes_new');
+                if (!is_array($ignored_themes_new_update)) $ignored_themes_new_update = array();
+                $ignored_themes_to_update = get_option('mainwp_updatescheck_mail_ignore_themes');
+                if (!is_array($ignored_themes_to_update)) $ignored_themes_to_update = array();
 
-                if ((count($themesNewUpdate) != 0) || (count($themesToUpdate) != 0) || (count($ignoredThemesNewUpdate) != 0) || (count($ignoredThemesToUpdate) != 0))
+                if ((count($themes_new_update) != 0) || (count($themes_to_update) != 0) || (count($ignored_themes_new_update) != 0) || (count($ignored_themes_to_update) != 0))
                 {
                     $sendMail = TRUE;
 
                     $mail .= '<div><strong>WordPress Themes Updates</strong></div>';
                     $mail .= '<ul>';
-                    $mail .= $this->print_updates_array_lines($themesNewUpdate, null);
-                    $mail .= $this->print_updates_array_lines($themesToUpdate, $sitesCheckCompleted);
-                    $mail .= $this->print_updates_array_lines($ignoredThemesNewUpdate, null);
-                    $mail .= $this->print_updates_array_lines($ignoredThemesToUpdate, null);
+                    $mail .= $this->print_updates_array_lines($themes_new_update, null);
+                    $mail .= $this->print_updates_array_lines($themes_to_update, $sites_check_completed);
+                    $mail .= $this->print_updates_array_lines($ignored_themes_new_update, null);
+                    $mail .= $this->print_updates_array_lines($ignored_themes_to_update, null);
                     $mail .= '</ul>';
                 }
 
-                $coreNewUpdate = get_option('mainwp_updatescheck_mail_update_core_new');
-                if (!is_array($coreNewUpdate)) $coreNewUpdate = array();
-                $coreToUpdate = get_option('mainwp_updatescheck_mail_update_core');
-                if (!is_array($coreToUpdate)) $coreToUpdate = array();
-                $ignoredCoreNewUpdate = get_option('mainwp_updatescheck_mail_ignore_core_new');
-                if (!is_array($ignoredCoreNewUpdate)) $ignoredCoreNewUpdate = array();
-                $ignoredCoreToUpdate = get_option('mainwp_updatescheck_mail_ignore_core');
-                if (!is_array($ignoredCoreToUpdate)) $ignoredCoreToUpdate = array();
+                $core_new_update = get_option('mainwp_updatescheck_mail_update_core_new');
+                if (!is_array($core_new_update)) $core_new_update = array();
+                $core_to_update = get_option('mainwp_updatescheck_mail_update_core');
+                if (!is_array($core_to_update)) $core_to_update = array();
+                $ignored_core_new_update = get_option('mainwp_updatescheck_mail_ignore_core_new');
+                if (!is_array($ignored_core_new_update)) $ignored_core_new_update = array();
+                $ignored_core_to_update = get_option('mainwp_updatescheck_mail_ignore_core');
+                if (!is_array($ignored_core_to_update)) $ignored_core_to_update = array();
 
-                if ((count($coreNewUpdate) != 0) || (count($coreToUpdate) != 0) || (count($ignoredCoreNewUpdate) != 0) || (count($ignoredCoreToUpdate) != 0))
+                if ((count($core_new_update) != 0) || (count($core_to_update) != 0) || (count($ignored_core_new_update) != 0) || (count($ignored_core_to_update) != 0))
                 {
                     $sendMail = TRUE;
 
                     $mail .= '<div><strong>WordPress Core Updates</strong></div>';
                     $mail .= '<ul>';
-                    $mail .= $this->print_updates_array_lines($coreNewUpdate, null);
-                    $mail .= $this->print_updates_array_lines($coreToUpdate, $sitesCheckCompleted);
-                    $mail .= $this->print_updates_array_lines($ignoredCoreNewUpdate, null);
-                    $mail .= $this->print_updates_array_lines($ignoredCoreToUpdate, null);
+                    $mail .= $this->print_updates_array_lines($core_new_update, null);
+                    $mail .= $this->print_updates_array_lines($core_to_update, $sites_check_completed);
+                    $mail .= $this->print_updates_array_lines($ignored_core_new_update, null);
+                    $mail .= $this->print_updates_array_lines($ignored_core_to_update, null);
                     $mail .= '</ul>';
                 }
 
-                $pluginConflicts = get_option('mainwp_updatescheck_mail_pluginconflicts');
-                if ($pluginConflicts === FALSE) $pluginConflicts = '';
+                $plugin_conflicts = get_option('mainwp_updatescheck_mail_pluginconflicts');
+                if ($plugin_conflicts === FALSE) $plugin_conflicts = '';
 
-                if ($pluginConflicts != '')
+                if ($plugin_conflicts != '')
                 {
                     $sendMail = TRUE;
                     $mail .= '<div><strong>WordPress Plugin Conflicts</strong></div>';
                     $mail .= '<ul>';
-                    $mail .= $pluginConflicts;
+                    $mail .= $plugin_conflicts;
                     $mail .= '</ul>';
                 }
 
-                $themeConflicts = get_option('mainwp_updatescheck_mail_themeconflicts');
-                if ($themeConflicts === FALSE) $themeConflicts = '';
+                $theme_conflicts = get_option('mainwp_updatescheck_mail_themeconflicts');
+                if ($theme_conflicts === FALSE) $theme_conflicts = '';
 
-                if ($themeConflicts != '')
+                if ($theme_conflicts != '')
                 {
                     $sendMail = TRUE;
                     $mail .= '<div><strong>WordPress Theme Conflicts</strong></div>';
                     $mail .= '<ul>';
-                    $mail .= $themeConflicts;
+                    $mail .= $theme_conflicts;
                     $mail .= '</ul>';
                 }
 
@@ -221,7 +309,7 @@ class BAUFM_Updater {
                     return;
                 }
 
-                if ($mainwpAutomaticDailyUpdate !== FALSE && $mainwpAutomaticDailyUpdate != 0)
+                if ($baufm_automatic_weekly_update !== FALSE && $baufm_automatic_weekly_update != 0)
                 {
                     //Create a nice email to send
                     $email = get_option('mainwp_updatescheck_mail_email');
@@ -240,490 +328,485 @@ class BAUFM_Updater {
                     }
                 }
             }
-        }
-        else
-        {
-            $userExtension = MainWPDB::Instance()->getUserExtensionByUserId($userid);
+        } else {
 
-            $decodedIgnoredPlugins = json_decode($userExtension->ignored_plugins, TRUE);
-            if (!is_array($decodedIgnoredPlugins)) $decodedIgnoredPlugins = array();
+            /**
+             * In MainWP, the mainwp_users table lists the trusted/ignored/dismissed
+             * plugins/themes/conflicts FOR EACH user. So we get them them here for the
+             * current user.
+             */
+            $user_extension = MainWPDB::Instance()->getUserExtensionByUserId( $user_id );
 
-            $trustedPlugins = json_decode($userExtension->trusted_plugins, TRUE);
-            if (!is_array($trustedPlugins)) $trustedPlugins = array();
+            // Get the ignored plugins.
+            $decoded_ignored_plugins = json_decode( $user_extension->ignored_plugins, TRUE );
+            if ( ! is_array( $decoded_ignored_plugins ) ) {
+                $decoded_ignored_plugins = array();
+            }
 
-            $decodedIgnoredThemes = json_decode($userExtension->ignored_themes, TRUE);
-            if (!is_array($decodedIgnoredThemes)) $decodedIgnoredThemes = array();
+            // Get the trusted plugins.
+            $trusted_plugins = json_decode( $user_extension->trusted_plugins, TRUE);
+            if ( ! is_array( $trusted_plugins ) ) {
+                $trusted_plugins = array();
+            }
 
-            $trustedThemes = json_decode($userExtension->trusted_themes, TRUE);
-            if (!is_array($trustedThemes)) $trustedThemes = array();
+            // Get the ignored themes.
+            $decoded_ignored_themes = json_decode( $user_extension->ignored_themes, TRUE );
+            if ( ! is_array( $decoded_ignored_themes ) ) {
+                $decoded_ignored_themes = array();
+            }
 
-            $coreToUpdateNow = array();
-            $coreToUpdate = array();
-            $coreNewUpdate = array();
-            $ignoredCoreToUpdate = array();
-            $ignoredCoreNewUpdate = array();
+            // Get the trusted themes.
+            $trusted_themes = json_decode( $user_extension->trusted_themes, TRUE );
+            if ( ! is_array( $trusted_themes ) ) {
+                $trusted_themes = array();
+            }
 
-            $pluginsToUpdateNow = array();
-            $pluginsToUpdate = array();
-            $pluginsNewUpdate = array();
-            $ignoredPluginsToUpdate = array();
-            $ignoredPluginsNewUpdate = array();
+            // Core updates.
+            $core_to_update_now         = array();
+            $core_to_update             = array();
+            $core_new_update            = array();
+            $ignored_core_to_update     = array();
+            $ignored_core_new_update    = array();
 
-            $themesToUpdateNow = array();
-            $themesToUpdate = array();
-            $themesNewUpdate = array();
-            $ignoredThemesToUpdate = array();
-            $ignoredThemesNewUpdate = array();
+            // Plugin updates.
+            $plugins_to_update_now      = array();
+            $plugins_to_update          = array();
+            $plugins_new_update         = array();
+            $ignored_plugins_to_update  = array();
+            $ignored_plugins_new_update = array();
 
-            $pluginConflicts = '';
-            $themeConflicts = '';
+            // Theme updates.
+            $themes_to_update_now       = array();
+            $themes_to_update           = array();
+            $themes_new_update          = array();
+            $ignored_themes_to_update   = array();
+            $ignored_themes_new_update  = array();
 
-            $allWebsites = array();
+            // Conflicts.
+            $plugin_conflicts           = '';
+            $theme_conflicts            = '';
 
-            $infoTrustedText = ' (<span style="color:#008000"><strong>Trusted</strong></span>)';
-            $infoNotTrustedText = ' (<strong><span style="color:#ff0000">Not Trusted</span></strong>)';
+            // All
+            $all_websites               = array();
 
-            foreach ($websites as $website)
-            {
-                $websiteDecodedIgnoredPlugins = json_decode($website->ignored_plugins, TRUE);
-                if (!is_array($websiteDecodedIgnoredPlugins)) $websiteDecodedIgnoredPlugins = array();
+            $info_trusted_text          = ' (<span style="color:#008000"><strong>Trusted</strong></span>)';
+            $info_not_trusted_text      = ' (<strong><span style="color:#ff0000">Not Trusted</span></strong>)';
 
-                $websiteDecodedIgnoredThemes = json_decode($website->ignored_themes, TRUE);
-                if (!is_array($websiteDecodedIgnoredThemes)) $websiteDecodedIgnoredThemes = array();
+            // Go over each website in our current group.
+            foreach ( $updates_for_current_group as $website ) {
+                // Get the ignored plugins.
+                $website_decoded_ignored_plugins = json_decode( $website->ignored_plugins, TRUE );
+                if ( ! is_array( $website_decoded_ignored_plugins ) ) $website_decoded_ignored_plugins = array();
 
-                //Perform check & update
-                if (!MainWPSync::syncSite($website, FALSE, TRUE))
-                {
-                    $websiteValues = array(
+                // Get the ignored themes.
+                $website_decoded_ignored_themes = json_decode( $website->ignored_themes, TRUE );
+                if ( ! is_array( $website_decoded_ignored_themes ) ) $website_decoded_ignored_themes = array();
+
+                // Perform check and update.
+                if ( ! MainWPSync::syncSite( $website, FALSE, TRUE ) ) {
+                    $website_values = array(
                         'dtsAutomaticSync' => time()
                     );
 
-                    MainWPDB::Instance()->updateWebsiteSyncValues($website->id, $websiteValues);
+                    MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, $website_values );
 
                     continue;
                 }
-                $website = MainWPDB::Instance()->getWebsiteById($website->id);
 
-                /** Check core upgrades **/
-                $websiteLastCoreUpgrades = json_decode(MainWPDB::Instance()->getWebsiteOption($website, 'last_wp_upgrades'), TRUE);
-                $websiteCoreUpgrades = json_decode(MainWPDB::Instance()->getWebsiteOption($website, 'wp_upgrades'), TRUE);
+                $website = MainWPDB::Instance()->getWebsiteById( $website->id );
 
-                //Run over every update we had last time..
-                if (isset($websiteCoreUpgrades['current']))
-                {
-                    $infoTxt = '<a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ' . $websiteCoreUpgrades['current'] . ' to ' . $websiteCoreUpgrades['new'];
-                    $infoNewTxt = '*NEW* <a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ' . $websiteCoreUpgrades['current'] . ' to ' . $websiteCoreUpgrades['new'];
-                    $newUpdate = !(isset($websiteLastCoreUpgrades['current']) && ($websiteLastCoreUpgrades['current'] == $websiteCoreUpgrades['current']) && ($websiteLastCoreUpgrades['new'] == $websiteCoreUpgrades['new']));
-                    if ($website->automatic_update == 1)
-                    {
-                        if ($newUpdate)
-                        {
-                            $coreNewUpdate[] = array($website->id, $infoNewTxt, $infoTrustedText);
+                // Check core upgrades.
+                $website_last_core_upgrades = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'last_wp_upgrades' ), TRUE );
+                $website_core_upgrades      = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'wp_upgrades' ), TRUE );
+
+                // Run over every update we had last time.
+                if ( isset( $website_core_upgrades['current'] ) ) {
+                    $info_txt     = '<a href="' . admin_url( 'admin.php?page=managesites&dashboard=' . $website->id ) . '">' . $website->name . '</a> - ' . $website_core_upgrades['current'] . ' to ' . $website_core_upgrades['new'];
+                    $info_new_txt = '*NEW* <a href="' . admin_url( 'admin.php?page=managesites&dashboard=' . $website->id ) . '">' . $website->name . '</a> - ' . $website_core_upgrades['current'] . ' to ' . $website_core_upgrades['new'];
+                    $new_update   = ! ( isset( $website_last_core_upgrades['current'] ) && ( $website_last_core_upgrades['current'] == $website_core_upgrades['current'] ) && ( $website_last_core_upgrades['new'] == $website_core_upgrades['new'] ) );
+                    
+                    $do_what_for_group = apply_filters( 'baufm_do_what_for_group', $do_what_for_group, $website->id, $group_id );
+
+                    // If we are OK to install trusted updates.
+                    if ( 1 === $do_what_for_group ) {
+                        if ( $new_update ) {
+                            $core_new_update[] = array( $website->id, $info_new_txt, $info_trusted_text );
+                        } else {
+                            // Check ignore ? $ignored_core_to_update.
+                            $core_to_update_now[]           = $website->id;
+                            $all_websites[ $website->id ]   = $website;
+                            $core_to_update[]               = array($website->id, $info_txt, $info_trusted_text);
                         }
-                        else
-                        {
-                            //Check ignore ? $ignoredCoreToUpdate
-                            $coreToUpdateNow[] = $website->id;
-                            $allWebsites[$website->id] = $website;
-                            $coreToUpdate[] = array($website->id, $infoTxt, $infoTrustedText);
-                        }
-                    }
-                    else
-                    {
-                        if ($newUpdate)
-                        {
-                            $ignoredCoreNewUpdate[] = array($website->id, $infoNewTxt, $infoNotTrustedText);
-                        }
-                        else
-                        {
-                            $ignoredCoreToUpdate[] = array($website->id, $infoTxt, $infoNotTrustedText);
+                    // Nope, we're either set to email updates for approval or do nothing.
+                    } else {
+                        if ( $new_update ) {
+                            $ignored_core_new_update[] = array( $website->id, $info_new_txt, $info_not_trusted_text );
+                        } else {
+                            $ignored_core_to_update[] = array( $website->id, $info_txt, $info_not_trusted_text );
                         }
                     }
                 }
 
-                /** Check plugins **/
-                $websiteLastPlugins = json_decode(MainWPDB::Instance()->getWebsiteOption($website, 'last_plugin_upgrades'), TRUE);
-                $websitePlugins = json_decode($website->plugin_upgrades, TRUE);
+                // Check plugins.
+                $website_last_plugins = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'last_plugin_upgrades' ), TRUE );
+                $website_plugins      = json_decode( $website->plugin_upgrades, TRUE );
 
-                /** Check themes **/
-                $websiteLastThemes = json_decode(MainWPDB::Instance()->getWebsiteOption($website, 'last_theme_upgrades'), TRUE);
-                $websiteThemes = json_decode($website->theme_upgrades, TRUE);
+                // Check themes.
+                $website_last_themes  = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'last_theme_upgrades' ), TRUE );
+                $website_themes       = json_decode( $website->theme_upgrades, TRUE );
 
-                $decodedPremiumUpgrades = json_decode(MainWPDB::Instance()->getWebsiteOption($website, 'premium_upgrades'), TRUE);
-                if (is_array($decodedPremiumUpgrades))
-                {
-                    foreach ($decodedPremiumUpgrades as $slug => $premiumUpgrade)
-                    {
-                        if ($premiumUpgrade['type'] == 'plugin')
-                        {
-                            if (!is_array($websitePlugins)) $websitePlugins = array();
-                            $websitePlugins[$slug] = $premiumUpgrade;
-                        }
-                        else if ($premiumUpgrade['type'] == 'theme')
-                        {
-                            if (!is_array($websiteThemes)) $websiteThemes = array();
-                            $websiteThemes[$slug] = $premiumUpgrade;
+                $decoded_premium_upgrades = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'premium_upgrades' ), TRUE );
+                
+                // Add premium upgrades to the list of themes and plugins.
+                if ( is_array( $decoded_premium_upgrades ) ) {
+                    foreach ( $decoded_premium_upgrades as $slug => $premium_upgrade ) {
+                        if ( 'plugin' === $premium_upgrade['type'] ) {
+                            if ( ! is_array( $website_plugins ) ) {
+                                $website_plugins = array();
+                            }
+                            $website_plugins[ $slug ] = $premium_upgrade;
+                        } else if ( 'theme' === $premium_upgrade['type'] ) {
+                            if ( ! is_array( $website_themes ) ) {
+                                $website_themes = array();
+                            }
+                            $website_themes[ $slug ] = $premium_upgrade;
                         }
                     }
                 }
 
+                // Run over every update we had last time.
+                foreach ( $website_plugins as $plugin_slug => $plugin_info ) {
+                    $info_txt     = '<a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ' . $plugin_info['Name'] . ' ' . $plugin_info['Version'] . ' to ' . $plugin_info['update']['new_version'];
+                    $info_new_txt = '*NEW* <a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ' . $plugin_info['Name'] . ' ' . $plugin_info['Version'] . ' to ' . $plugin_info['update']['new_version'];
 
-                //Run over every update we had last time..
-                foreach ($websitePlugins as $pluginSlug => $pluginInfo)
-                {
-                    $infoTxt = '<a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ' . $pluginInfo['Name'] . ' ' . $pluginInfo['Version'] . ' to ' . $pluginInfo['update']['new_version'];
-                    $infoNewTxt = '*NEW* <a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ' . $pluginInfo['Name'] . ' ' . $pluginInfo['Version'] . ' to ' . $pluginInfo['update']['new_version'];
-
-                    $newUpdate = !(isset($websiteLastPlugins[$pluginSlug]) && ($pluginInfo['Version'] == $websiteLastPlugins[$pluginSlug]['Version']) && ($pluginInfo['update']['new_version'] == $websiteLastPlugins[$pluginSlug]['update']['new_version']));
-                    //update this..
-                    if (in_array($pluginSlug, $trustedPlugins) && !isset($decodedIgnoredPlugins[$pluginSlug]) && !isset($websiteDecodedIgnoredPlugins[$pluginSlug]))
-                    {
-                        //Trusted
-                        if ($newUpdate)
-                        {
-                            $pluginsNewUpdate[] = array($website->id, $infoNewTxt, $infoTrustedText);
+                    $new_update = ! ( isset( $website_last_plugins[ $plugin_slug ] ) && ($plugin_info['Version'] == $website_last_plugins[ $plugin_slug ]['Version'] ) && ( $plugin_info['update']['new_version'] == $website_last_plugins[ $plugin_slug ]['update']['new_version'] ) );
+                    
+                    // Update this.
+                    if ( in_array( $plugin_slug, $trusted_plugins ) && ! isset( $decoded_ignored_plugins[ $plugin_slug ] ) && ! isset( $website_decoded_ignored_plugins[ $plugin_slug ] ) ) {                        
+                        // Trusted.
+                        if ( $new_update ) {
+                            $plugins_new_update[] = array( $website->id, $info_new_txt, $info_trusted_text );
+                        } else {
+                            $plugins_to_updateNow[ $website->id ][] = $plugin_slug;
+                            $all_websites[ $website->id ]           = $website;
+                            $plugins_to_update[]                    = array( $website->id, $info_txt, $info_trusted_text );
                         }
-                        else
-                        {
-                            $pluginsToUpdateNow[$website->id][] = $pluginSlug;
-                            $allWebsites[$website->id] = $website;
-                            $pluginsToUpdate[] = array($website->id, $infoTxt, $infoTrustedText);
-                        }
-                    }
-                    else
-                    {
-                        //Not trusted
-                        if ($newUpdate)
-                        {
-                            $ignoredPluginsNewUpdate[] = array($website->id, $infoNewTxt, $infoNotTrustedText);
-                        }
-                        else
-                        {
-                            $ignoredPluginsToUpdate[] = array($website->id, $infoTxt, $infoNotTrustedText);
+                    } else {
+                        // Not trusted.
+                        if ( $new_update ) {
+                            $ignored_plugins_new_update[] = array( $website->id, $info_new_txt, $info_not_trusted_text );
+                        } else {
+                            $ignored_plugins_to_update[] = array( $website->id, $info_txt, $info_not_trusted_text );
                         }
                     }
                 }
 
-                //Run over every update we had last time..
-                foreach ($websiteThemes as $themeSlug => $themeInfo)
-                {
-                    $infoTxt = '<a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ' . $themeInfo['Name'] . ' ' . $themeInfo['Version'] . ' to ' . $themeInfo['update']['new_version'];
-                    $infoNewTxt = '*NEW* <a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ' . $themeInfo['Name'] . ' ' . $themeInfo['Version'] . ' to ' . $themeInfo['update']['new_version'];
+                // Run over every update we had last time.
+                foreach ( $website_themes as $theme_slug => $theme_info ) {
+                    $info_txt     = '<a href="' . admin_url( 'admin.php?page=managesites&dashboard=' . $website->id ) . '">' . $website->name . '</a> - ' . $theme_info['Name'] . ' ' . $theme_info['Version'] . ' to ' . $theme_info['update']['new_version'];
+                    $info_new_txt = '*NEW* <a href="' . admin_url( 'admin.php?page=managesites&dashboard=' . $website->id ) . '">' . $website->name . '</a> - ' . $theme_info['Name'] . ' ' . $theme_info['Version'] . ' to ' . $theme_info['update']['new_version'];
 
-                    $newUpdate = !(isset($websiteLastThemes[$themeSlug]) && ($themeInfo['Version'] == $websiteLastThemes[$themeSlug]['Version']) && ($themeInfo['update']['new_version'] == $websiteLastThemes[$themeSlug]['update']['new_version']));
-                    //update this..
-                    if (in_array($themeSlug, $trustedThemes) && !isset($decodedIgnoredThemes[$themeSlug]) && !isset($websiteDecodedIgnoredThemes[$themeSlug]))
-                    {
-                        //Trusted
-                        if ($newUpdate)
-                        {
-                            $themesNewUpdate[] = array($website->id, $infoNewTxt, $infoTrustedText);
+                    $new_update = ! ( isset( $website_last_themes[ $theme_slug ] ) && ( $theme_info['Version'] == $website_last_themes[$theme_slug]['Version']) && ($theme_info['update']['new_version'] == $website_last_themes[$theme_slug]['update']['new_version']));
+    
+                    // Update this.
+                    if ( in_array( $theme_slug, $trusted_themes ) && ! isset( $decoded_ignored_themes[ $theme_slug ] ) && ! isset( $website_decoded_ignored_themes[ $theme_slug ] ) ) {
+                        // Trusted.
+                        if ( $new_update ) {
+                            $themes_new_update[] = array( $website->id, $info_new_txt, $info_trusted_text );
+                        } else {
+                            $themes_to_update_now[ $website->id ][] = $theme_slug;
+                            $all_websites[ $website->id ]           = $website;
+                            $themes_to_update[]                     = array( $website->id, $info_txt, $info_trusted_text );
                         }
-                        else
-                        {
-                            $themesToUpdateNow[$website->id][] = $themeSlug;
-                            $allWebsites[$website->id] = $website;
-                            $themesToUpdate[] = array($website->id, $infoTxt, $infoTrustedText);
-                        }
-                    }
-                    else
-                    {
-                        //Not trusted
-                        if ($newUpdate)
-                        {
-                            $ignoredThemesNewUpdate[] = array($website->id, $infoNewTxt, $infoNotTrustedText);
-                        }
-                        else
-                        {
-                            $ignoredThemesToUpdate[] = array($website->id, $infoTxt, $infoNotTrustedText);
+                    } else {
+                        // Not trusted.
+                        if ( $new_update ) {
+                            $ignored_themes_new_update[] = array( $website->id, $info_new_txt, $info_not_trusted_text );
+                        } else {
+                            $ignored_themes_to_update[] = array( $website->id, $info_txt, $info_not_trusted_text );
                         }
                     }
                 }
 
-                /**
-                 * Show plugin conflicts
-                 */
-                $sitePluginConflicts = json_decode($website->pluginConflicts, TRUE);
-                if (count($sitePluginConflicts) > 0)
-                {
-                    $infoTxt = '<a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ';
+                // Show plugin conflicts.
+                $site_plugin_conflicts = json_decode( $website->pluginConflicts, TRUE );
+                if ( count( $site_plugin_conflicts ) > 0 ) {
+                    $info_txt            = '<a href="' . admin_url( 'admin.php?page=managesites&dashboard=' . $website->id ) . '">' . $website->name . '</a> - ';
+                    $plugin_conflicts   .= '<li>' . $info_txt;
+                    $added               = FALSE;
 
-                    $pluginConflicts .= '<li>' . $infoTxt;
-                    $added = FALSE;
-                    foreach ($sitePluginConflicts as $sitePluginConflict)
-                    {
-                        if ($added) $pluginConflicts .= ', ';
-                        $pluginConflicts .= $sitePluginConflict;
+                    foreach ( $site_plugin_conflicts as $site_plugin_conflict ) {
+                        if ( $added ) {
+                            $plugin_conflicts .= ', ';
+                        }
+                        
+                        $plugin_conflicts .= $site_plugin_conflict;
                         $added = TRUE;
                     }
-                    $pluginConflicts .= '</li>' . "\n";
+
+                    $plugin_conflicts .= '</li>' . "\n";
                 }
 
-                /**
-                 * Show theme conflicts
-                 */
-                $siteThemeConflicts = json_decode($website->themeConflicts, TRUE);
-                if (count($siteThemeConflicts) > 0)
-                {
-                    $infoTxt = '<a href="' . admin_url('admin.php?page=managesites&dashboard=' . $website->id) . '">' . $website->name . '</a> - ';
+                // Show theme conflicts.
+                $site_theme_conflicts = json_decode( $website->themeConflicts, TRUE );
+                if ( count( $site_theme_conflicts ) > 0 ) {
+                    $info_txt         = '<a href="' . admin_url( 'admin.php?page=managesites&dashboard=' . $website->id ) . '">' . $website->name . '</a> - ';
+                    $theme_conflicts .= '<li>' . $info_txt;
+                    $added            = FALSE;
+                    
+                    foreach ( $site_theme_conflicts as $site_theme_conflict ) {
+                        if ( $added ) {
+                            $theme_conflicts .= ', ';
+                        }
 
-                    $themeConflicts .= '<li>' . $infoTxt;
-                    $added = FALSE;
-                    foreach ($siteThemeConflicts as $siteThemeConflict)
-                    {
-                        if ($added) $themeConflicts .= ', ';
-                        $themeConflicts .= $siteThemeConflict;
+                        $theme_conflicts .= $site_theme_conflict;
                         $added = TRUE;
                     }
-                    $themeConflicts .= '</li>' . "\n";
+                    $theme_conflicts .= '</li>' . "\n";
                 }
 
-                //Loop over last plugins & current plugins, check if we need to upgrade them..
-                $user = get_userdata($website->userid);
-                $email = MainWPUtility::getNotificationEmail($user);
-                MainWPUtility::update_option('mainwp_updatescheck_mail_email', $email);
-                MainWPDB::Instance()->updateWebsiteSyncValues($website->id, array('dtsAutomaticSync' => time()));
-                MainWPDB::Instance()->updateWebsiteOption($website, 'last_wp_upgrades', json_encode($websiteCoreUpgrades));
-                MainWPDB::Instance()->updateWebsiteOption($website, 'last_plugin_upgrades', $website->plugin_upgrades);
-                MainWPDB::Instance()->updateWebsiteOption($website, 'last_theme_upgrades', $website->theme_upgrades);
+                // Loop over last plugins & current plugins, check if we need to upgrade them.
+                $user  = get_userdata( $website->userid );
+                $email = MainWPUtility::getNotificationEmail( $user );
+                
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_email', $email );
+                
+                MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, array( 'dtsAutomaticSync' => time() ) );
+                MainWPDB::Instance()->updateWebsiteOption( $website, 'last_wp_upgrades', json_encode( $website_core_upgrades ) );
+                MainWPDB::Instance()->updateWebsiteOption( $website, 'last_plugin_upgrades', $website->plugin_upgrades );
+                MainWPDB::Instance()->updateWebsiteOption( $website, 'last_theme_upgrades', $website->theme_upgrades );
             }
 
-            if (count($coreNewUpdate) != 0)
-            {
-                $coreNewUpdateSaved = get_option('mainwp_updatescheck_mail_update_core_new');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_update_core_new', MainWPUtility::array_merge($coreNewUpdateSaved, $coreNewUpdate));
+            if ( count( $core_new_update ) != 0 ) {
+                $core_new_update_saved = get_option( 'mainwp_updatescheck_mail_update_core_new' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_update_core_new', MainWPUtility::array_merge( $core_new_update_saved, $core_new_update ) );
             }
 
-            if (count($pluginsNewUpdate) != 0)
-            {
-                $pluginsNewUpdateSaved = get_option('mainwp_updatescheck_mail_update_plugins_new');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_update_plugins_new', MainWPUtility::array_merge($pluginsNewUpdateSaved, $pluginsNewUpdate));
+            if ( count( $plugins_new_update ) != 0 ) {
+                $plugins_new_update_saved = get_option( 'mainwp_updatescheck_mail_update_plugins_new' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_update_plugins_new', MainWPUtility::array_merge( $plugins_new_update_saved, $plugins_new_update ) );
             }
 
-            if (count($themesNewUpdate) != 0)
-            {
-                $themesNewUpdateSaved = get_option('mainwp_updatescheck_mail_update_themes_new');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_update_themes_new', MainWPUtility::array_merge($themesNewUpdateSaved, $themesNewUpdate));
+            if ( count( $themes_new_update ) != 0 ) {
+                $themes_new_update_saved = get_option( 'mainwp_updatescheck_mail_update_themes_new' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_update_themes_new', MainWPUtility::array_merge( $themes_new_update_saved, $themes_new_update ) );
             }
 
-            if (count($coreToUpdate) != 0)
-            {
-                $coreToUpdateSaved = get_option('mainwp_updatescheck_mail_update_core');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_update_core', MainWPUtility::array_merge($coreToUpdateSaved, $coreToUpdate));
+            if ( count( $core_to_update ) != 0 ) {
+                $core_to_update_saved = get_option( 'mainwp_updatescheck_mail_update_core' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_update_core', MainWPUtility::array_merge( $core_to_update_saved, $core_to_update ) );
             }
 
-            if (count($pluginsToUpdate) != 0)
-            {
-                $pluginsToUpdateSaved = get_option('mainwp_updatescheck_mail_update_plugins');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_update_plugins', MainWPUtility::array_merge($pluginsToUpdateSaved, $pluginsToUpdate));
+            if ( count( $plugins_to_update ) != 0 ) {
+                $plugins_to_update_saved = get_option( 'mainwp_updatescheck_mail_update_plugins' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_update_plugins', MainWPUtility::array_merge( $plugins_to_update_saved, $plugins_to_update ) );
             }
 
-            if (count($themesToUpdate) != 0)
-            {
-                $themesToUpdateSaved = get_option('mainwp_updatescheck_mail_update_themes');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_update_themes', MainWPUtility::array_merge($themesToUpdateSaved, $themesToUpdate));
+            if ( count( $themes_to_update ) != 0 ) {
+                $themes_to_update_saved = get_option( 'mainwp_updatescheck_mail_update_themes' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_update_themes', MainWPUtility::array_merge( $themes_to_update_saved, $themes_to_update ) );
             }
 
-            if (count($ignoredCoreToUpdate) != 0)
-            {
-                $ignoredCoreToUpdateSaved = get_option('mainwp_updatescheck_mail_ignore_core');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_ignore_core', MainWPUtility::array_merge($ignoredCoreToUpdateSaved, $ignoredCoreToUpdate));
+            if ( count( $ignored_core_to_update ) != 0 ) {
+                $ignored_core_to_update_saved = get_option( 'mainwp_updatescheck_mail_ignore_core' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_ignore_core', MainWPUtility::array_merge( $ignored_core_to_update_saved, $ignored_core_to_update ) );
             }
 
-            if (count($ignoredCoreNewUpdate) != 0)
-            {
-                $ignoredCoreNewUpdateSaved = get_option('mainwp_updatescheck_mail_ignore_core_new');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_ignore_core_new', MainWPUtility::array_merge($ignoredCoreNewUpdateSaved, $ignoredCoreNewUpdate));
+            if ( count( $ignored_core_new_update ) != 0 ) {
+                $ignored_core_new_update_saved = get_option( 'mainwp_updatescheck_mail_ignore_core_new' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_ignore_core_new', MainWPUtility::array_merge( $ignored_core_new_update_saved, $ignored_core_new_update ) );
             }
 
-            if (count($ignoredPluginsToUpdate) != 0)
-            {
-                $ignoredPluginsToUpdateSaved = get_option('mainwp_updatescheck_mail_ignore_plugins');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_ignore_plugins', MainWPUtility::array_merge($ignoredPluginsToUpdateSaved, $ignoredPluginsToUpdate));
+            if ( count( $ignored_plugins_to_update ) != 0 ) {
+                $ignored_plugins_to_update_saved = get_option( 'mainwp_updatescheck_mail_ignore_plugins' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_ignore_plugins', MainWPUtility::array_merge( $ignored_plugins_to_update_saved, $ignored_plugins_to_update ) );
             }
 
-            if (count($ignoredPluginsNewUpdate) != 0)
-            {
-                $ignoredPluginsNewUpdateSaved = get_option('mainwp_updatescheck_mail_ignore_plugins_new');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_ignore_plugins_new', MainWPUtility::array_merge($ignoredPluginsNewUpdateSaved, $ignoredPluginsNewUpdate));
+            if ( count( $ignored_plugins_new_update ) != 0 ) {
+                $ignored_plugins_new_update_saved = get_option('mainwp_updatescheck_mail_ignore_plugins_new');
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_ignore_plugins_new', MainWPUtility::array_merge( $ignored_plugins_new_update_saved, $ignored_plugins_new_update ) );
             }
 
-            if (count($ignoredThemesToUpdate) != 0)
-            {
-                $ignoredThemesToUpdateSaved = get_option('mainwp_updatescheck_mail_ignore_themes');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_ignore_themes', MainWPUtility::array_merge($ignoredThemesToUpdateSaved, $ignoredThemesToUpdate));
+            if ( count( $ignored_themes_to_update ) != 0) {
+                $ignored_themes_to_update_saved = get_option( 'mainwp_updatescheck_mail_ignore_themes' );
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_ignore_themes', MainWPUtility::array_merge( $ignored_themes_to_update_saved, $ignored_themes_to_update ) );
             }
 
-            if (count($ignoredThemesNewUpdate) != 0)
-            {
-                $ignoredThemesNewUpdateSaved = get_option('mainwp_updatescheck_mail_ignore_themes_new');
-                MainWPUtility::update_option('mainwp_updatescheck_mail_ignore_themes_new', MainWPUtility::array_merge($ignoredThemesNewUpdateSaved, $ignoredThemesNewUpdate));
+            if ( count( $ignored_themes_new_update ) != 0 ) {
+                $ignored_themes_new_updateSaved = get_option('mainwp_updatescheck_mail_ignore_themes_new');
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_ignore_themes_new', MainWPUtility::array_merge($ignored_themes_new_updateSaved, $ignored_themes_new_update));
             }
 
-            if ($pluginConflicts != '')
-            {
-                $pluginConflictsSaved = get_option('mainwp_updatescheck_mail_pluginconflicts');
-                if ($pluginConflictsSaved == FALSE) $pluginConflictsSaved = '';
-                MainWPUtility::update_option('mainwp_updatescheck_mail_pluginconflicts', $pluginConflictsSaved . $pluginConflicts);
+            if ( $plugin_conflicts != '' ) {
+                $plugin_conflicts_saved = get_option( 'mainwp_updatescheck_mail_pluginconflicts' );
+                
+                if ( FALSE == $plugin_conflicts_saved ) {
+                    $plugin_conflicts_saved = '';
+                }
+
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_pluginconflicts', $plugin_conflicts_saved . $plugin_conflicts );
             }
 
-            if ($themeConflicts != '')
-            {
-                $themeConflictsSaved = get_option('mainwp_updatescheck_mail_themeconflicts');
-                if ($themeConflictsSaved == FALSE) $themeConflictsSaved = '';
-                MainWPUtility::update_option('mainwp_updatescheck_mail_themeconflicts', $themeConflictsSaved . $themeConflicts);
+            if ( $theme_conflicts != '' ) {
+                $theme_conflicts_saved = get_option( 'mainwp_updatescheck_mail_themeconflicts' );
+                
+                if ( FALSE == $theme_conflicts_saved ) {
+                    $theme_conflicts_saved = '';
+                }
+                
+                MainWPUtility::update_option( 'mainwp_updatescheck_mail_themeconflicts', $theme_conflicts_saved . $theme_conflicts );
             }
 
-            if ((count($coreToUpdate) == 0) && (count($pluginsToUpdate) == 0) && (count($themesToUpdate) == 0) && (count($ignoredCoreToUpdate) == 0)  && (count($ignoredCoreNewUpdate) == 0) && (count($ignoredPluginsToUpdate) == 0) && (count($ignoredPluginsNewUpdate) == 0) && (count($ignoredThemesToUpdate) == 0) && (count($ignoredThemesNewUpdate) == 0) && ($pluginConflicts == '') && ($themeConflicts == ''))
-            {
+            if ( ( count( $core_to_update ) == 0 ) && ( count( $plugins_to_update ) == 0 ) && ( count( $themes_to_update ) == 0 ) && ( count( $ignored_core_to_update ) == 0 )  && ( count( $ignored_core_new_update ) == 0 ) && ( count( $ignored_plugins_to_update ) == 0 ) && ( count( $ignored_plugins_new_update ) == 0 ) && ( count( $ignored_themes_to_update ) == 0 ) && ( count( $ignored_themes_new_update ) == 0 ) && ( $plugin_conflicts == '' ) && ( $theme_conflicts == '' ) ) {
                 return;
             }
 
-            if (get_option('mainwp_automaticDailyUpdate') != 1) return;
+            if ( get_option( 'baufm_automatic_weekly_update' ) != 1 ) {
+                return;
+            }
 
-
-            //Check if backups are required!
-            if (get_option('mainwp_backup_before_upgrade') == 1)
-            {
-                $sitesCheckCompleted = get_option('mainwp_automaticUpdate_backupChecks');
-                if (!is_array($sitesCheckCompleted)) $sitesCheckCompleted = array();
+            // Check if backups are required!
+            if ( 1 == get_option( 'mainwp_backup_before_upgrade' ) ) {
+                
+                $sites_check_completed = get_option( 'mainwp_automaticUpdate_backupChecks' );
+                
+                if ( ! is_array( $sites_check_completed ) ) {
+                    $sites_check_completed = array();
+                }
 
                 $websitesToCheck = array();
-                foreach ($pluginsToUpdateNow as $websiteId => $slugs)
-                {
-                    $websitesToCheck[$websiteId] = TRUE;
+                
+                foreach ( $plugins_to_update_now as $websiteId => $slugs ) {
+                    $websitesToCheck[ $websiteId ] = TRUE;
                 }
 
-                foreach ($themesToUpdateNow as $websiteId => $slugs)
-                {
-                    $websitesToCheck[$websiteId] = TRUE;
+                foreach ( $themes_to_update_now as $websiteId => $slugs ) {
+                    $websitesToCheck[ $websiteId ] = TRUE;
                 }
 
-                foreach ($coreToUpdateNow as $websiteId)
-                {
-                    $websitesToCheck[$websiteId] = TRUE;
+                foreach ( $core_to_update_now as $websiteId ) {
+                    $websitesToCheck[ $websiteId ] = TRUE;
                 }
 
-                foreach ($websitesToCheck as $siteId => $bool)
-                {
-                    if ($allWebsites[$siteId]->backup_before_upgrade == 0)
-                    {
-                        $sitesCheckCompleted[$siteId] = TRUE;
+                foreach ( $websitesToCheck as $siteId => $bool ) {
+
+                    if ( $all_websites[$siteId]->backup_before_upgrade == 0 ) {
+                        $sites_check_completed[ $siteId ] = TRUE;
                     }
-                    if (isset($sitesCheckCompleted[$siteId])) continue;
 
-                    $dir = MainWPUtility::getMainWPSpecificDir($siteId);
-                    //Check if backup ok
+                    if ( isset( $sites_check_completed[ $siteId ] ) ) { 
+                        continue;
+                    }
+
+                    $dir = MainWPUtility::getMainWPSpecificDir( $siteId );
+                    
+                    // Check if backup ok.
                     $lastBackup = -1;
-                    if (file_exists($dir) && ($dh = opendir($dir)))
-                    {
-                        while (($file = readdir($dh)) !== FALSE)
-                        {
-                            if ($file != '.' && $file != '..')
-                            {
+                    if ( file_exists( $dir ) && ( $dh = opendir( $dir ) ) ) {
+                        while ( ( $file = readdir( $dh ) ) !== FALSE ) {
+                            if ( $file != '.' && $file != '..' ) {
                                 $theFile = $dir . $file;
-                                if (MainWPUtility::isArchive($file) && !MainWPUtility::isSQLArchive($file) && (filemtime($theFile) > $lastBackup))
-                                {
+                                if ( MainWPUtility::isArchive( $file ) && ! MainWPUtility::isSQLArchive( $file ) && ( filemtime( $theFile ) > $lastBackup ) ) {
                                     $lastBackup = filemtime($theFile);
                                 }
                             }
                         }
-                        closedir($dh);
+                        closedir( $dh );
                     }
 
-                    $backupRequired = ($lastBackup < (time() - (7 * 24 * 60 * 60)) ? TRUE : FALSE);
+                    $backupRequired = ( $lastBackup < ( time() - ( 7 * 24 * 60 * 60 ) ) ? TRUE : FALSE );
 
-                    if (!$backupRequired)
-                    {
-                        $sitesCheckCompleted[$siteId] = TRUE;
-                        MainWPUtility::update_option('mainwp_automaticUpdate_backupChecks', $sitesCheckCompleted);
+                    if ( ! $backupRequired ) {
+                        $sites_check_completed[ $siteId ] = TRUE;
+                        MainWPUtility::update_option( 'mainwp_automaticUpdate_backupChecks', $sites_check_completed );
                         continue;
                     }
 
-                    try
-                    {
-                        $result = MainWPManageSites::backup($siteId, 'full', '', '', 0, 0, 0, 0);
-                        MainWPManageSites::backupDownloadFile($siteId, 'full', $result['url'], $result['local']);
-                        $sitesCheckCompleted[$siteId] = TRUE;
-                        MainWPUtility::update_option('mainwp_automaticUpdate_backupChecks', $sitesCheckCompleted);
-                    }
-                    catch (Exception $e)
-                    {
-                        $sitesCheckCompleted[$siteId] = FALSE;
-                        MainWPUtility::update_option('mainwp_automaticUpdate_backupChecks', $sitesCheckCompleted);
+                    try {
+                        $result = MainWPManageSites::backup( $siteId, 'full', '', '', 0, 0, 0, 0 );
+                        MainWPManageSites::backupDownloadFile( $siteId, 'full', $result['url'], $result['local'] );
+                        $sites_check_completed[ $siteId ] = TRUE;
+                        MainWPUtility::update_option( 'mainwp_automaticUpdate_backupChecks', $sites_check_completed );
+                    } catch ( Exception $e ) {
+                        $sites_check_completed[ $siteId ] = FALSE;
+                        MainWPUtility::update_option( 'mainwp_automaticUpdate_backupChecks', $sites_check_completed );
                     }
                 }
-            }
-            else
-            {
-                $sitesCheckCompleted = null;
+            } else {
+                $sites_check_completed = NULL;
             }
 
+            // Update plugins.
+            foreach ( $plugins_to_update_now as $websiteId => $slugs ) {
+                
+                // Skip if site check is not completed.
+                if ( ( $sites_check_completed != NULL ) && ( $sites_check_completed[ $websiteId ] == FALSE ) ) {
+                    continue;
+                }
 
-            //Update plugins
-            foreach ($pluginsToUpdateNow as $websiteId => $slugs)
-            {
-                if (($sitesCheckCompleted != null) && ($sitesCheckCompleted[$websiteId] == FALSE)) continue;
-
-                try
-                {
-                    MainWPUtility::fetchUrlAuthed($allWebsites[$websiteId], 'upgradeplugintheme', array(
+                // Let's do it!
+                try {
+                    MainWPUtility::fetchUrlAuthed( $all_websites[ $websiteId ], 'upgradeplugintheme', array(
                         'type' => 'plugin',
-                        'list' => urldecode(implode(',', $slugs))
-                    ));
+                        'list' => urldecode( implode( ',', $slugs ) )
+                    ) );
 
-                    if (isset($information['sync']) && !empty($information['sync'])) MainWPSync::syncInformationArray($allWebsites[$websiteId], $information['sync']);
-                }
-                catch (Exception $e)
-                {
+                    if ( isset( $information['sync'] ) && ! empty( $information['sync'] ) ) MainWPSync::syncInformationArray( $all_websites[ $websiteId ], $information['sync'] );
+                } catch ( Exception $e ) {
                 }
             }
 
-            //Update themes
-            foreach ($themesToUpdateNow as $websiteId => $slugs)
-            {
-                if (($sitesCheckCompleted != null) && ($sitesCheckCompleted[$websiteId] == FALSE)) continue;
+            // Update themes
+            foreach ( $themes_to_update_now as $websiteId => $slugs ) {
 
-                try
-                {
-                    MainWPUtility::fetchUrlAuthed($allWebsites[$websiteId], 'upgradeplugintheme', array(
+                // Skip if site check is not completed.
+                if ( ( $sites_check_completed != null ) && ( $sites_check_completed[ $websiteId ] == FALSE ) ) {
+                    continue;
+                }
+
+                // Let's do it!
+                try {
+                    MainWPUtility::fetchUrlAuthed( $all_websites[ $websiteId ] , 'upgradeplugintheme', array(
                         'type' => 'theme',
                         'list' => urldecode(implode(',', $slugs))
-                    ));
+                    ) );
 
-                    if (isset($information['sync']) && !empty($information['sync'])) MainWPSync::syncInformationArray($allWebsites[$websiteId], $information['sync']);
-                }
-                catch (Exception $e)
-                {
+                    if ( isset( $information['sync'] ) && ! empty( $information['sync'] ) ) {
+                        MainWPSync::syncInformationArray( $all_websites[ $websiteId ], $information['sync'] );
+                    }
+                } catch ( Exception $e ) {
                 }
             }
 
-            //Update core
-            foreach ($coreToUpdateNow as $websiteId)
-            {
-                if (($sitesCheckCompleted != null) && ($sitesCheckCompleted[$websiteId] == FALSE)) continue;
-
-                try
-                {
-                    MainWPUtility::fetchUrlAuthed($allWebsites[$websiteId], 'upgrade');
+            // Update core.
+            foreach ( $core_to_update_now as $websiteId ) {
+                
+                if ( ( $sites_check_completed != null ) && ( $sites_check_completed[ $websiteId ] == FALSE ) ) {
+                    continue;
                 }
-                catch (Exception $e)
-                {
+
+                // Let's do it!
+                try {
+                    MainWPUtility::fetchUrlAuthed( $all_websites[ $websiteId ], 'upgrade' );
+                } catch ( Exception $e ) {
                 }
             }
-	        do_action( 'mainwp_cronupdatecheck_action', $pluginsNewUpdate, $pluginsToUpdate, $pluginsToUpdateNow, $themesNewUpdate, $themesToUpdate, $themesToUpdateNow, $coreNewUpdate, $coreToUpdate, $coreToUpdateNow );
+
+	        do_action( 'baufm_cronupdatecheck_action', $plugins_new_update, $plugins_to_update, $plugins_to_updateNow, $themes_new_update, $themes_to_update, $themes_to_update_now, $core_new_update, $core_to_update, $core_to_update_now );
         }
     }
 
     public function print_updates_array_lines( $array, $backupChecks ) {
         $output = '';
+
         foreach ( $array as $line ) {
-            $siteId = $line[0];
-            $text = $line[1];
+            $siteId      = $line[0];
+            $text        = $line[1];
             $trustedText = $line[2];
 
-            $output .= '<li>' . $text . $trustedText . ($backupChecks == null || !isset($backupChecks[$siteId]) || ($backupChecks[$siteId] == TRUE) ? '' : '(Requires manual backup)') . '</li>'."\n";
+            $output .= '<li>' . $text . $trustedText . ( $backupChecks == null || ! isset( $backupChecks[ $siteId ] ) || ( $backupChecks[ $siteId ] == TRUE ) ? '' : '(Requires manual backup)' ) . '</li>'."\n";
         }
+
         return $output;
     }
 }

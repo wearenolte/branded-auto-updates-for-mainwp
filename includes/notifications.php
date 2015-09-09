@@ -180,4 +180,4 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		}
 	}
 }
-add_action( 'mainwp_cronupdatecheck_action', 'baufm_send_emails_after_update', 10, 9 );
+add_action( 'baufm_cronupdatecheck_action', 'baufm_send_emails_after_update', 10, 9 );

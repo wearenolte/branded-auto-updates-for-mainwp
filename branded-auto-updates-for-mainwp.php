@@ -46,21 +46,23 @@ if ( ! function_exists( 'add_action' ) && ! function_exists( 'add_filter' ) ) {
 	exit;
 }
 
-define( 'BAUFM', plugin_basename( __FILE__ ) );
+define( 'BAUFM_PLUGIN_NAME', plugin_basename( __FILE__ ) );
 define( 'BAUFM_PREFIX', 'baufm_' );
 define( 'BAUFM_PLUGIN_VERSION', '0.2.0' );
-define( 'BAUFM_WP_VERSION', '4.2.3' );
+define( 'BAUFM_MIN_WP_VERSION', '4.2.3' );
 define( 'BAUFM_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'BAUFM_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
-// Autoload Composer modules. This will have to be replaced later.
-require_once( 'vendor/autoload.php' );
+if ( ! class_exists( 'PostmarkClientBase' ) || ! class_exists( 'Postmark\PostmarkClientBase' ) ) {
+	// Autoload Composer modules. This will have to be replaced later.
+	include_once( 'vendor/autoload.php' );
+}
 
-require_once( 'includes/vars.php' );
-require_once( 'includes/class.baufm-main.php' );
-require_once( 'includes/class.baufm-updater.php' );
-require_once( 'includes/notifications.php' );
-require_once( 'admin/admin.php' );
+include_once( 'includes/vars.php' );
+include_once( 'includes/class.baufm-main.php' );
+include_once( 'includes/class.baufm-updater.php' );
+include_once( 'includes/notifications.php' );
+include_once( 'admin/admin.php' );
 
 register_activation_hook( __FILE__, array( 'BAUFM_Main', 'maybe_deactivate' ) );
 register_activation_hook( __FILE__, array( 'BAUFM_Main', 'maybe_update' ) );

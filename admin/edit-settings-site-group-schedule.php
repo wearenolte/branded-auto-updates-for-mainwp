@@ -158,9 +158,10 @@ $sheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
         <select name="sheduled_action">
           <?php
             $sheduled_action_list = array(
-              'Off',
-              'Email Updates',
-              'Install Trusted Updates',
+              __( 'Do nothing.', 'baufm' ),
+              __( 'Just email me when updates are available for review.', 'baufm' ),
+              __( "Install my trusted updates and then email me when you're done.", 'baufm' ),
+              __( "Install my trusted updates and but don't notify at all.", 'baufm' ),
             );
           
             foreach ( $sheduled_action_list as $value => $text ) {

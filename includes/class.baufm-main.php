@@ -50,14 +50,21 @@ class BAUFM_Main {
 
 		require_once( ABSPATH . 'wp-admin/includes/plugin.php' );
 
-		if ( version_compare( $wp_version, branded_auto_updates_for_mainwp_MINIMUM_WP_VERSION, '<' ) ) {
+		if ( version_compare( $wp_version, BAUFM_WP_VERSION, '<' ) ) {
 
-			deactivate_plugins( branded_auto_updates_for_mainwp_PLUGIN_NAME );
+			deactivate_plugins( BAUFM_PLUGIN_NAME );
 
-		  	$message = sprintf( esc_html__( 'WP JSON Movies %s requires WordPress %s or higher.', 'baufm' ), branded_auto_updates_for_mainwp_PLUGIN_VERSION, branded_auto_updates_for_mainwp_MINIMUM_WP_VERSION );
+		  	$message = sprintf( __( 'Branded Auto Updates for MainWP %s requires WordPress %s or higher.', 'baufm' ), BAUFM_PLUGIN_VERSION, BAUFM_MIN_WP_VERSION );
 
 	  		wp_die( $message );
 		  	exit;
+		}
+
+		if ( ! defined( 'MAINWP_PLUGIN_FILE' ) ) {
+			deactivate_plugins( BAUFM_PLUGIN_NAME );
+
+			wp_die( __( "Hi there! I'm just a MainWP extension, not much I can do on my own.", 'baufm' ), __( 'MainWP Required', 'baufm' ) );
+			exit;
 		}
 	}
 

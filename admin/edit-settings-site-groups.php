@@ -5,6 +5,8 @@
  * @since 0.2.0
  *
  * @package Branded_Auto_Updates_For_MainWP
+ *
+ * @todo Re-implement this as list table.
  */
 ?>
 
@@ -21,8 +23,8 @@
 	<thead>
 		<tr>
 			<th scope="col" id="" class="manage-column column- column-primary"><span>Site Group</span></th>
-			<th scope="col" id="" class="manage-column column-"><span>Next Update</span></th>
 			<th scope="col" id="" class="manage-column column-"><span>Last Update</span></th>
+			<th scope="col" id="" class="manage-column column-"><span>Next Update</span></th>
 		</tr>
 	</thead>
 
@@ -56,9 +58,25 @@
 					</div>
 				</td>
 
-				<td class="lastupdated column-lastupdated" data-colname="Last Updated"><?php echo get_option( "baufm_group_{$group->id}_last_updated", 'Never' ); ?></td>
+				<td class="lastupdated column-lastupdated" data-colname="Last Updated">
+					
+				</td>
 
-				<td class="registered column-nextupdate" data-colname="Next Update"><?php echo get_option( "baufm_group_{$group->id}_next_update", 'Never' ); ?></td>
+				<td class="nextupdate column-nextupdate" data-colname="Next Update">
+					<?php
+						$last_automatic_update = MainWPDB::Instance()->getWebsitesLastAutomaticSync();
+
+						if ( 0 == $last_automatic_update ) {
+				            $next_automatic_update = __( 'Any minute.', 'baufm' );
+				        } else if ( MainWPDB::Instance()->getWebsitesCountWhereDtsAutomaticSyncSmallerThenStart() > 0 || MainWPDB::Instance()->getWebsitesCheckUpdatesCount() > 0 ) {
+				            $next_automatic_update = __( 'Processing your websites.', 'baufm' );
+				        } else {
+				        	$next_automatic_update = get_option( "baufm_scheduled_action_group_{$group->id}", __( 'Never.', 'baufm' ) );
+				        }
+					?>
+
+					<?php echo $next_automatic_update; ?>
+				</td>
 			</tr>
 		<?php endforeach; ?>
 	</tbody>

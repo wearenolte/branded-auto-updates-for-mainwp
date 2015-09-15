@@ -33,5 +33,5 @@
 </tbody>
 </table>
 <p>*<?php echo wp_kses( __( 'Indicates <strong>required</strong> fields.', 'baufm' ), array( 'strong' => array() ) ); ?></p>
-<?php submit_button( __( 'Test', 'baufm' ), 'primary', 'baufm_test_send', FALSE ); ?>
+<?php submit_button( __( 'Test', 'baufm' ), 'primary', 'baufm_test_send', false ); ?>
 </form>

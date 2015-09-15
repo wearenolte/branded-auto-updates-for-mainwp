@@ -7,9 +7,9 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 	update_option('shit_150', array(
 		$pluginsNewUpdate,
 		$pluginsToUpdate,
-		$pluginsToUpdateNow
+		$pluginsToUpdateNow,
 	));
-	
+
 	MainWPLogger::Instance()->info( 'MainWP Multiple Email Notification' );
 
 	$website_updates = array();
@@ -24,14 +24,14 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$plugin_html = $new_plugin[1] . $new_plugin[2];
 
 		$website_updates[ $new_plugin[0] ]['plugins'][] = $plugin_html;
-		
+
 		$temlate_model->plugins_update[] = array(
 			'name' => branded_auto_updates_for_mainwp_strip_html_and_contents( $plugin_html ),
 		);
 	}
 	foreach ( $pluginsToUpdate as $plugin ) {
 		$plugin_html = $plugin[1] . $plugin[2];
-		
+
 		$website_updates[ $plugin[0] ]['plugins'][] = $plugin_html;
 
 		$temlate_model->plugins_update[] = array(
@@ -138,13 +138,13 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 			$server_token 		= get_option( 'baufm_config_server_token', '' );
 			$sender_signature 	= get_option( 'baufm_config_signature', '' );
 			$template 			= (int) get_option( 'baufm_config_template_id', '' );
-			$enable_post_mark  	= (bool) get_option( 'baufm_config_enable_post_mark', FALSE );
+			$enable_post_mark  	= (bool) get_option( 'baufm_config_enable_post_mark', false );
 
 			if ( ! empty( $emails ) && is_array( $emails ) ) {
 				foreach ( $emails as $email ) {
 					$email = trim( $email );
 					MainWPLogger::Instance()->info( var_export( $email, true ) );
-					
+
 					if ( is_email( $email ) ) {
 						if ( $enable_post_mark && $server_token && $sender_signature ) {
 							try {
@@ -152,15 +152,15 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 
 								if ( $template ) {
 									$sendResult = $client->sendEmailWithTemplate(
-										$sender_signature, 
-										$email, 
+										$sender_signature,
+										$email,
 										$template,
 										$temlate_model
 									);
 								} else {
 									$sendResult = $client->sendEmail(
-										$sender_signature, 
-										$email, 
+										$sender_signature,
+										$email,
 										$website->name . ' - ' . __( 'Trusted Automated Updates', 'baufm' ),
 										$body
 									);
@@ -172,7 +172,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 						 	}
 						} else {
 							$body = branded_auto_updates_for_mainwp_format_email( $email, $mail_content, $website->name, $website->url );
-							wp_mail( $email, $website->name . ' - Trusted Automated Updates', $body, array( 'From: "' . get_option( 'admin_email' ) . '" <' . get_option( 'admin_email' ) . '>', 'content-type: text/html' ) );	
+							wp_mail( $email, $website->name . ' - Trusted Automated Updates', $body, array( 'From: "' . get_option( 'admin_email' ) . '" <' . get_option( 'admin_email' ) . '>', 'content-type: text/html' ) );
 						}
 					}
 				}

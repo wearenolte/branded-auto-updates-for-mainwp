@@ -29,11 +29,11 @@
 	</thead>
 
 	<tbody id="the-list">
-	<?php		
+	<?php
 		$groups_and_count = MainWPDB::Instance()->getGroupsAndCount();
-		$websites 		  = MainWPDB::Instance()->getWebsitesCheckUpdates(4);
-		
-		foreach ( $groups_and_count as $group ) : ?>
+		$websites 		  = MainWPDB::Instance()->getWebsitesCheckUpdates( 4 );
+
+	foreach ( $groups_and_count as $group ) : ?>
 			<tr>
 				<td class="blogname column-blogname has-row-actions column-primary" data-colname="URL">
 					
@@ -45,12 +45,12 @@
 					
 					<div class="row-actions">
 						<?php
-							$edit_sechdule_url = add_query_arg( array(
-								'page' 			=> 'branded-auto-updates-for-mainwp',
-								'tab' 			=> 'site-groups',
-								'tab-content' 	=> 'site-group-schedule',
-								'group-id'		=> $group->id,
-							), admin_url( 'admin.php' ) );
+						$edit_sechdule_url = add_query_arg( array(
+							'page' 			=> 'branded-auto-updates-for-mainwp',
+							'tab' 			=> 'site-groups',
+							'tab-content' 	=> 'site-group-schedule',
+							'group-id'		=> $group->id,
+						), admin_url( 'admin.php' ) );
 						?>
 						<span class="edit"><span class="edit"><a href="<?php echo esc_url( $edit_sechdule_url ); ?>">Edit Schedule</a></span> | </span>
 						<span class="edit"><span class="edit"><a href="<?php echo $group->id; ?>">Cancel Schedule</a></span> | </span>
@@ -64,15 +64,15 @@
 
 				<td class="nextupdate column-nextupdate" data-colname="Next Update">
 					<?php
-						$last_automatic_update = MainWPDB::Instance()->getWebsitesLastAutomaticSync();
+					$last_automatic_update = MainWPDB::Instance()->getWebsitesLastAutomaticSync();
 
-						if ( 0 == $last_automatic_update ) {
-				            $next_automatic_update = __( 'Any minute.', 'baufm' );
-				        } else if ( MainWPDB::Instance()->getWebsitesCountWhereDtsAutomaticSyncSmallerThenStart() > 0 || MainWPDB::Instance()->getWebsitesCheckUpdatesCount() > 0 ) {
-				            $next_automatic_update = __( 'Processing your websites.', 'baufm' );
-				        } else {
-				        	$next_automatic_update = get_option( "baufm_scheduled_action_group_{$group->id}", __( 'Never.', 'baufm' ) );
-				        }
+					if ( 0 == $last_automatic_update ) {
+						$next_automatic_update = __( 'Any minute.', 'baufm' );
+					} else if ( MainWPDB::Instance()->getWebsitesCountWhereDtsAutomaticSyncSmallerThenStart() > 0 || MainWPDB::Instance()->getWebsitesCheckUpdatesCount() > 0 ) {
+						$next_automatic_update = __( 'Processing your websites.', 'baufm' );
+					} else {
+						$next_automatic_update = get_option( "baufm_scheduled_action_group_{$group->id}", __( 'Never.', 'baufm' ) );
+					}
 					?>
 
 					<?php echo $next_automatic_update; ?>

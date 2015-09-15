@@ -29,12 +29,12 @@ class BAUFM_Main {
 	    add_option( 'baufm_config_server_token', '' );
 	    add_option( 'baufm_config_signature', '' );
 	    add_option( 'baufm_config_template_id', '' );
-	    
+
 	    wp_clear_scheduled_hook( 'mainwp_cronupdatescheck_action' );
 	    $baufm_updater = new BAUFM_Updater();
 
 	    ob_start();
-  	}
+	}
 
 	/**
 	 * Checks program environment to see if all dependencies are available. If at least one

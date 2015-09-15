@@ -13,7 +13,7 @@
  * Do not use this when sending out templated PostMark HTML emails. When using
  * the Template API, you must edit your own PostMark template and use the template
  * fields provided by this plugin.
- * 
+ *
  * @since 0.2.0
  * @author Udit Desai <udesai@getmoxied.net>
  *
@@ -24,24 +24,24 @@
  * @return String The HTML email message.
  */
 if ( ! function_exists( 'baufm_format_email' ) ) :
-function baufm_format_email( $to, $body, $website_name, $website_url ) {
-	if ( ! is_email( $to ) ) {
-		return '';
-	}
+	function baufm_format_email( $to, $body, $website_name, $website_url ) {
+		if ( ! is_email( $to ) ) {
+			return '';
+		}
 
-	if ( ! is_string( $body ) ) {
-		return '';
-	}
+		if ( ! is_string( $body ) ) {
+			return '';
+		}
 
-	if ( ! is_string( $website_name ) ) {
-		return '';
-	}
+		if ( ! is_string( $website_name ) ) {
+			return '';
+		}
 
-	if ( ! is_string( $website_url ) ) {
-		return '';
-	}
+		if ( ! is_string( $website_url ) ) {
+			return '';
+		}
 
-	return '<br>
+		return '<br>
 			<div>
             <br>
             <div style="background:#ffffff;padding:0 1.618em;font:13px/20px Helvetica,Arial,Sans-serif;padding-bottom:50px!important">
@@ -93,5 +93,5 @@ function baufm_format_email( $to, $body, $website_name, $website_url ) {
             </div>
 </div>
 <br>';
-}
+	}
 endif;

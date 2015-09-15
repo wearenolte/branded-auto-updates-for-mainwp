@@ -22,7 +22,7 @@
 <fieldset>
 <legend class="screen-reader-text"><span><?php _e( 'Enable PostMark', 'baufm' ); ?></span></legend>
 <label for="enable_postmark">
-<input name="enable_postmark" type="checkbox" id="enable_postmark" value="1" <?php checked( get_option( 'baufm_config_enable_post_mark', '' ), 1, TRUE ); ?>>
+<input name="enable_postmark" type="checkbox" id="enable_postmark" value="1" <?php checked( get_option( 'baufm_config_enable_post_mark', '' ), 1, true ); ?>>
 <?php _e( 'Use PostMark instead of  <code>wp_mail()</code> when sending auto-update notifications from MainWP.', 'baufm' ); ?>
 </label>
 </fieldset>
@@ -36,7 +36,7 @@
 <label for="server_token">
 <input class="regular-text ltr" name="server_token" type="text" id="server_token" value="<?php esc_attr_e( get_option( 'baufm_config_server_token', '' ) ); ?>" placeholder="<?php _e( 'PostMark Server Token', 'baufm' ); ?>" required>
 </label>
-<p class="description"><?php echo sprintf( wp_kses( __( 'Get your <a href="%s">server token</a> from your PostMark account. This is required for authentication on server specific endpoints.', 'baufm' ), array(  'a' => array( 'href' => array() ) ) ), esc_url( 'https://postmarkapp.com/servers' ) ); ?></p>
+<p class="description"><?php echo sprintf( wp_kses( __( 'Get your <a href="%s">server token</a> from your PostMark account. This is required for authentication on server specific endpoints.', 'baufm' ), array( 'a' => array( 'href' => array() ) ) ), esc_url( 'https://postmarkapp.com/servers' ) ); ?></p>
 </fieldset>
 </td>
 </tr>
@@ -47,7 +47,7 @@
 <legend class="screen-reader-text"><span><?php _e( 'Settings', 'baufm' ); ?></span></legend>
 <label for="sender_signature">
 <input class="regular-text ltr" name="sender_signature" type="text" id="sender_signature" value="<?php esc_attr_e( get_option( 'baufm_config_signature', '' ) ); ?>" placeholder="<?php _e( 'sender@example.com', 'baufm' ); ?>" required>
-<p class="description"><?php echo sprintf( wp_kses( __( 'Select from one of the validated <a href="%s">sender signatures</a> you have on your PostMark account.', 'baufm' ), array(  'a' => array( 'href' => array() ) ) ), esc_url( 'https://postmarkapp.com/signatures' ) ); ?></p>
+<p class="description"><?php echo sprintf( wp_kses( __( 'Select from one of the validated <a href="%s">sender signatures</a> you have on your PostMark account.', 'baufm' ), array( 'a' => array( 'href' => array() ) ) ), esc_url( 'https://postmarkapp.com/signatures' ) ); ?></p>
 </label>
 </fieldset>
 </td>
@@ -59,7 +59,7 @@
 <legend class="screen-reader-text"><span><?php _e( 'Settings', 'baufm' ); ?></span></legend>
 <label for="template">
 <input class="regular-text ltr" name="template" type="number" id="template" value="<?php esc_attr_e( get_option( 'baufm_config_template_id', '' ) ); ?>" min="0" placeholder="<?php _e( 'ID', 'baufm' ); ?>">
-<p class="description"><?php echo sprintf( wp_kses( __( 'Find the <abr>HTML</abr> template you wish to use in the "Templates" section of <a href="%s">server</a> you wish to use.', 'baufm' ), array(  'a' => array( 'href' => array() ) ) ), esc_url( 'https://postmarkapp.com/servers' ) ); ?></p>
+<p class="description"><?php echo sprintf( wp_kses( __( 'Find the <abr>HTML</abr> template you wish to use in the "Templates" section of <a href="%s">server</a> you wish to use.', 'baufm' ), array( 'a' => array( 'href' => array() ) ) ), esc_url( 'https://postmarkapp.com/servers' ) ); ?></p>
 <br>
 <p><?php _e( 'When using PostMark Templates, the following Mustachio hooks can be used for pulling data into your email template:', 'baufm' );?></p>
 <p><code>{{#each plugins_update}}{{name}}{{/each}}</code>, <code>{{#each themes_update}}{{name}}{{/each}}</code>, <code>{{#each core_update}}{{name}}{{/each}}</code>, <code>{{site_url}}</code>, <code>{{from_date}}</code>, <code>{{to_date}}</code></p>

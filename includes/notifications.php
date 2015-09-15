@@ -4,13 +4,7 @@ use Postmark\PostmarkClient;
 use Postmark\Models\PostmarkException;
 
 function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $pluginsToUpdateNow, $themesNewUpdate, $themesToUpdate, $themesToUpdateNow, $coreNewUpdate, $coreToUpdate, $coreToUpdateNow ) {
-	update_option('shit_150', array(
-		$pluginsNewUpdate,
-		$pluginsToUpdate,
-		$pluginsToUpdateNow,
-	));
-
-	MainWPLogger::Instance()->info( 'MainWP Multiple Email Notification' );
+	MainWPLogger::Instance()->info( 'CRON :: done with updates, now let us send some email' );
 
 	$website_updates = array();
 	$template_model = new stdClass();
@@ -26,7 +20,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$website_updates[ $new_plugin[0] ]['plugins'][] = $plugin_html;
 
 		$temlate_model->plugins_update[] = array(
-			'name' => branded_auto_updates_for_mainwp_strip_html_and_contents( $plugin_html ),
+			'name' => baufm_strip_html_and_contents( $plugin_html ),
 		);
 	}
 	foreach ( $pluginsToUpdate as $plugin ) {
@@ -35,7 +29,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$website_updates[ $plugin[0] ]['plugins'][] = $plugin_html;
 
 		$temlate_model->plugins_update[] = array(
-			'name' => branded_auto_updates_for_mainwp_strip_html_and_contents( $plugin_html ),
+			'name' => baufm_strip_html_and_contents( $plugin_html ),
 		);
 	}
 
@@ -46,7 +40,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$website_updates[ $new_theme[0] ]['themes'][] = $theme_html;
 
 		$temlate_model->themes_update[] = array(
-			'name' => branded_auto_updates_for_mainwp_strip_html_and_contents( $theme_html ),
+			'name' => baufm_strip_html_and_contents( $theme_html ),
 		);
 	}
 	foreach ( $themesToUpdate as $theme ) {
@@ -55,7 +49,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$website_updates[ $theme[0] ]['themes'][] = $theme_html;
 
 		$temlate_model->themes_update[] = array(
-			'name' => branded_auto_updates_for_mainwp_strip_html_and_contents( $theme_html ),
+			'name' => baufm_strip_html_and_contents( $theme_html ),
 		);
 	}
 
@@ -66,7 +60,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$website_updates[ $new_core[0] ]['core'][] = $core_html;
 
 		$temlate_model->core_update[] = array(
-			'name' => branded_auto_updates_for_mainwp_strip_html_and_contents( $core_html ),
+			'name' => baufm_strip_html_and_contents( $core_html ),
 		);
 	}
 	foreach ( $coreToUpdate as $core ) {
@@ -75,7 +69,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$website_updates[ $core[0] ]['core'][] = $core_html;
 
 		$temlate_model->core_update[] = array(
-			'name' => branded_auto_updates_for_mainwp_strip_html_and_contents( $core_html ),
+			'name' => baufm_strip_html_and_contents( $core_html ),
 		);
 	}
 
@@ -165,14 +159,19 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 										$body
 									);
 								}
+
+								MainWPLogger::Instance()->info( 'CRON :: email sent' );
 						 	} catch ( PostmarkException $ex ) {
 						 		MainWPLogger::Instance()->info( var_export( $ex, true ) );
+						 		MainWPLogger::Instance()->info( 'CRON :: there has been a problem with postmark' );
 						 	} catch ( Exception $generalException ) {
 						 		MainWPLogger::Instance()->info( var_export( $generalException, true ) );
+						 		MainWPLogger::Instance()->info( 'CRON :: there has been a problem sending the email' );
 						 	}
 						} else {
-							$body = branded_auto_updates_for_mainwp_format_email( $email, $mail_content, $website->name, $website->url );
+							$body = baufm_format_email( $email, $mail_content, $website->name, $website->url );
 							wp_mail( $email, $website->name . ' - Trusted Automated Updates', $body, array( 'From: "' . get_option( 'admin_email' ) . '" <' . get_option( 'admin_email' ) . '>', 'content-type: text/html' ) );
+							MainWPLogger::Instance()->info( 'CRON :: attempted to send mail via wp_mail' );
 						}
 					}
 				}

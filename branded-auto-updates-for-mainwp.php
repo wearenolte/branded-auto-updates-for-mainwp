@@ -58,7 +58,8 @@ if ( ! class_exists( 'PostmarkClientBase' ) || ! class_exists( 'Postmark\Postmar
 	include_once( 'vendor/autoload.php' );
 }
 
-include_once( 'includes/vars.php' );
+include_once( 'includes/helpers-strings.php' );
+include_once( 'includes/helpers-mail.php' );
 include_once( 'includes/class.baufm-main.php' );
 include_once( 'includes/class.baufm-updater.php' );
 include_once( 'includes/notifications.php' );

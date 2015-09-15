@@ -37,7 +37,7 @@ foreach ( $actions as $action_ ) {
 $current_tab = 'site-groups';
 
 // If user specified a tab to view, use it.
-if ( isset( $_REQUEST['tab'] ) && in_array( $_REQUEST['tab'] , array( 'email-config', 'test', 'site-groups' ) ) ) {
+if ( isset( $_REQUEST['tab'] ) && in_array( $_REQUEST['tab'] , array( 'email-config', 'email-test', 'site-groups' ) ) ) {
 	$current_tab = $_REQUEST['tab'];
 }
 

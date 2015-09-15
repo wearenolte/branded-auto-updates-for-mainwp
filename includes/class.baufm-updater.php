@@ -126,11 +126,11 @@ class BAUFM_Updater {
 
 		MainWPLogger::Instance()->info( 'CRON :: updates check' );
 
-		@ignore_user_abort( true );
-		@set_time_limit( 0 );
+		ignore_user_abort( true );
+		set_time_limit( 0 );
 		$mem = '512M';
-		@ini_set( 'memory_limit', $mem );
-		@ini_set( 'max_execution_time', 0 );
+		ini_set( 'memory_limit', $mem );
+		ini_set( 'max_execution_time', 0 );
 
 		// Used in MainWPServerInformation.page.php for display purposes only.
 		MainWPUtility::update_option( 'mainwp_cron_last_updatescheck', time() );

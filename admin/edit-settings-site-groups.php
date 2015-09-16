@@ -59,7 +59,16 @@
 				</td>
 
 				<td class="lastupdated column-lastupdated" data-colname="Last Updated">
-					
+					<?php
+						$last_scheduled_update_time = get_option( "baufm_last_scheduled_update_{$group->id}", 0 );
+						$last_scheduled_update = __( 'Never.', 'baufm' );
+
+						if ( 0 !== (int) $last_scheduled_update_time ) {
+							$last_scheduled_update = date_i18n( 'l, j F Y h:i A e', $last_scheduled_update_time );
+						}
+
+						echo $last_scheduled_update;
+					?>
 				</td>
 
 				<td class="nextupdate column-nextupdate" data-colname="Next Update">
@@ -71,11 +80,51 @@
 					} else if ( MainWPDB::Instance()->getWebsitesCountWhereDtsAutomaticSyncSmallerThenStart() > 0 || MainWPDB::Instance()->getWebsitesCheckUpdatesCount() > 0 ) {
 						$next_automatic_update = __( 'Processing your websites.', 'baufm' );
 					} else {
-						$next_automatic_update = get_option( "baufm_scheduled_action_group_{$group->id}", __( 'Never.', 'baufm' ) );
+						$daily_schedule = baufm_get_scheduled_day_of_week( $group->id, 'int' );
+						$is_off 	 	= ( 0 === $daily_schedule || ! $daily_schedule );
+						$is_daily 	 	= ( 1 === $daily_schedule );
+
+						if ( $is_off ) {
+							$next_automatic_update = baufm_format_scheduled_day_of_week( $daily_schedule );
+						} else {
+							if ( $is_daily ) {
+								if ( date_i18n('G') >= baufm_get_scheduled_time_of_day( $group->id, 'int' ) ) {
+									$next_automatic_update = sprintf( __( 'Tomorrow at %s %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ), date_i18n( 'e' ) );
+									$str_to_time = sprintf( __( 'tomorrow %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ) );
+								} else {
+									$next_automatic_update = sprintf( __( 'Today at %s %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ), date_i18n( 'e' ) );
+									$str_to_time = sprintf( __( 'today %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ) );
+								} 
+							} else {
+								if ( date_i18n('G') >= baufm_get_scheduled_time_of_day( $group->id, 'int' ) ) {
+									$next_automatic_update = sprintf( __( 'Next %s at %s %s', 'baufm' ), baufm_format_scheduled_day_of_week( $daily_schedule ), baufm_get_scheduled_time_of_day( $group->id ), date_i18n( 'e' ) );
+									$str_to_time = sprintf( __( 'next %s %s', 'baufm' ), baufm_format_scheduled_day_of_week( $daily_schedule ), baufm_get_scheduled_time_of_day( $group->id ) );
+								} else {
+									$next_automatic_update = sprintf( __( 'Today at %s %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ), date_i18n( 'e' ) );
+									$str_to_time = sprintf( __( 'today %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ) );
+								} 
+							}
+						}
 					}
 					?>
 
 					<?php echo $next_automatic_update; ?>
+					<br>
+					<?php
+						$from = strtotime( date( 'l, j F Y h:i A e', strtotime( $str_to_time ) ) );
+						$to = time();
+
+						if ( $from > $to ) {
+							$days = floor( ( $from - $to ) / ( 60 * 60 * 24 ) );
+							$hours = floor( ( ( $from - $to ) / ( 60 * 60 ) ) - ( $days * 24 ) );
+							$minutes = floor( ( ( $from - $to ) / 60 ) - ( $days * 24 * 60 ) - ( $hours * 60 ) );
+							$seconds = ( $from - $to ) - ( $days * 24 * 60 * 60 ) - ( $hours * 60 * 60 ) - ( $minutes * 60 );
+
+							echo sprintf( 'Updating in %d days %d hours %d minutes %d seconds', $days, $hours, $minutes, $seconds );	
+						} else {
+							echo __( 'Updating now.', 'baufm' );
+						}
+					?>
 				</td>
 			</tr>
 		<?php endforeach; ?>

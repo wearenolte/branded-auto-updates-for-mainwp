@@ -49,13 +49,13 @@ $sheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
 			$schedule_in_week_values = array(
 			  'Off',
 			  'Everyday',
+			  'Every Sunday',
 			  'Every Monday',
 			  'Every Tuesday',
 			  'Every Wednesday',
 			  'Every Thursday',
 			  'Every Friday',
 			  'Every Saturday',
-			  'Every Sunday',
 			);
 
 			foreach ( $schedule_in_week_values as $index => $day ) {
@@ -69,14 +69,12 @@ $sheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
         <select name="schedule_in_day">
 			<?php for ( $i = 0; $i < 24; $i++ ) : ?>
             <?php
-			  $suffix = ( $i >= 12 ) ? 'PM' : 'AM';
-			  $time   = ( $i <= 12 ) ? $i : $i - 12;
-			  $time   = ( $time < 10 ) ? '0' . $time : $time;
+			  $time = baufm_format_scheduled_time_of_day( $i );
 			?>
             <?php if ( 0 == $i ) : ?>
               <option value="0" <?php echo selected( $i, $schedule_in_day ); ?>>12:00 <?php echo $suffix; ?></option>
             <?php else : ?>
-              <option value="<?php echo $time; ?>" <?php echo selected( $i, $schedule_in_day ); ?>><?php echo $time; ?>:00 <?php echo $suffix; ?></option>
+              <option value="<?php echo $time; ?>" <?php echo selected( $i, $schedule_in_day ); ?>><?php echo $time; ?> <?php echo $suffix; ?></option>
             <?php endif; ?>
 			<?php endfor; ?>
         </select>

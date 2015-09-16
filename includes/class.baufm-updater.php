@@ -74,18 +74,22 @@ class BAUFM_Updater {
 		$schedule_in_week = (int) get_option( "baufm_schedule_in_week_group_$group_id", 0 );
 
 		$days = array(
+			'Sunday',
 			'Monday',
 			'Tuesday',
 			'Wednesday',
 			'Thursday',
 			'Friday',
 			'Saturday',
-			'Sunday',
 		);
 
 		if ( $schedule_in_week >= 2 ) {
 			$day = $schedule_in_week - 2;
 			return $days[ $day ];
+		}
+
+		if ( 1 === $schedule_in_week ) {
+			return date_i18n( 'w' );	
 		}
 
 		return 0;
@@ -147,11 +151,12 @@ class BAUFM_Updater {
 
 		// Loop through each site group and check if there is an update to do.
 		foreach ( $site_groups as $group ) {
-			if ( $this->get_scheduled_day_of_week( $group->id ) === date_i18n( 'l' ) ) {
+			MainWPLogger::Instance()->info( 'CRON :: get_scheduled_day_of_week ' .  $this->get_scheduled_day_of_week( $group->id ) . ' and now is ' . date_i18n( 'w' ) );
+			if ( $this->get_scheduled_day_of_week( $group->id ) === date_i18n( 'w' ) ) {
 				if ( (int) date_i18n( 'G' ) >= (int) $this->get_scheduled_time_of_day( $group->id ) ) {
-					if ( $this->get_last_scheduled_update_for_group( $group->id ) === date_i18n( 'd/m/Y' ) ) {
+					if ( date_i18n( 'd/m/Y', $this->get_last_scheduled_update_for_group( $group->id ) ) === date_i18n( 'd/m/Y' ) ) {
 						// No action to take. Already updated.
-						MainWPLogger::Instance()->debug( 'CRON :: updates check :: already updated today' );
+						MainWPLogger::Instance()->info( 'CRON :: updates check :: already updated today' );
 						continue;
 					} else {
 						// We should proceed with the update.
@@ -262,7 +267,7 @@ class BAUFM_Updater {
 				MainWPUtility::update_option( "mainwp_updatescheck_mail_themeconflicts_$group_id", '' );
 
 				MainWPLogger::Instance()->info( 'CRON :: setting last scheduled update for ' . $group_id . ' as ' . date( 'd/m/Y' ) );
-				$this->set_last_scheduled_update_for_group( $group_id, date( 'd/m/Y' ) );
+				$this->set_last_scheduled_update_for_group( $group_id, time() ); // date( 'd/m/Y' )
 			}
 		} else {
 
@@ -791,6 +796,8 @@ class BAUFM_Updater {
 					MainWPLogger::Instance()->info( 'CRON :: failed core updates for ' . $websiteId );
 				}
 			}
+
+			$this->set_last_scheduled_update_for_group( $group_id, time() );
 
 	        do_action( 'baufm_cronupdatecheck_action', $plugins_new_update, $plugins_to_update, $plugins_to_update_now, $themes_new_update, $themes_to_update, $themes_to_update_now, $core_new_update, $core_to_update, $core_to_update_now );
 		}

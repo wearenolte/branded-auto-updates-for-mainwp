@@ -89,7 +89,7 @@ class BAUFM_Updater {
 		}
 
 		if ( 1 === $schedule_in_week ) {
-			return date_i18n( 'w' );	
+			return date_i18n( 'w' );
 		}
 
 		return 0;

@@ -7,30 +7,17 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 	MainWPLogger::Instance()->info( 'CRON :: done with updates, now let us send some email' );
 
 	$website_updates = array();
-	$template_model = new stdClass();
-
-	$temlate_model->plugins_update 	= array();
-	$temlate_model->themes_update 	= array();
-	$temlate_model->core_update 	= array();
 
 	// Plugin
 	foreach ( $pluginsNewUpdate as $new_plugin ) {
 		$plugin_html = $new_plugin[1] . $new_plugin[2];
 
 		$website_updates[ $new_plugin[0] ]['plugins'][] = $plugin_html;
-
-		$temlate_model->plugins_update[] = array(
-			'name' => baufm_strip_html_and_contents( $plugin_html ),
-		);
 	}
 	foreach ( $pluginsToUpdate as $plugin ) {
 		$plugin_html = $plugin[1] . $plugin[2];
 
 		$website_updates[ $plugin[0] ]['plugins'][] = $plugin_html;
-
-		$temlate_model->plugins_update[] = array(
-			'name' => baufm_strip_html_and_contents( $plugin_html ),
-		);
 	}
 
 	// Theme
@@ -38,19 +25,11 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$theme_html = $new_theme[1] . $new_theme[2];
 
 		$website_updates[ $new_theme[0] ]['themes'][] = $theme_html;
-
-		$temlate_model->themes_update[] = array(
-			'name' => baufm_strip_html_and_contents( $theme_html ),
-		);
 	}
 	foreach ( $themesToUpdate as $theme ) {
 		$theme_html = $theme[1] . $theme[2];
 
 		$website_updates[ $theme[0] ]['themes'][] = $theme_html;
-
-		$temlate_model->themes_update[] = array(
-			'name' => baufm_strip_html_and_contents( $theme_html ),
-		);
 	}
 
 	// Core
@@ -58,25 +37,23 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$core_html = $new_core[1] . $new_core[2];
 
 		$website_updates[ $new_core[0] ]['core'][] = $core_html;
-
-		$temlate_model->core_update[] = array(
-			'name' => baufm_strip_html_and_contents( $core_html ),
-		);
 	}
 	foreach ( $coreToUpdate as $core ) {
 		$core_html = $core[1] . $core[2];
 
 		$website_updates[ $core[0] ]['core'][] = $core_html;
-
-		$temlate_model->core_update[] = array(
-			'name' => baufm_strip_html_and_contents( $core_html ),
-		);
 	}
 
 	MainWPLogger::Instance()->info( 'Websites:' );
 	MainWPLogger::Instance()->info( var_export( $website_updates, true ) );
 
 	foreach ( $website_updates as $website_id => $updates ) {
+
+		$template_model  				= new stdClass();
+		$temlate_model->plugins_update 	= array();
+		$temlate_model->themes_update 	= array();
+		$temlate_model->core_update 	= array();
+
 		MainWPLogger::Instance()->info( 'Website ID : ' . $website_id );
 		$website = MainWPDB::Instance()->getWebsiteById( $website_id );
 		$plugins_content = '';
@@ -86,6 +63,9 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 			$plugins_content .= '<ul>';
 			foreach ( $updates['plugins'] as $plugin_update ) {
 				$plugins_content .= ( '<li>' . $plugin_update . '</li>' );
+				$temlate_model->plugins_update[] = array(
+					'name' => baufm_strip_html_and_contents( $plugin_update ),
+				);
 			}
 			$plugins_content .= '</ul>';
 		}
@@ -96,7 +76,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 			foreach ( $updates['themes'] as $theme_update ) {
 				$themes_content .= ( '<li>' . $theme_update . '</li>' );
 				$temlate_model->themes_update[] = array(
-					'name' => $theme_update,
+					'name' => baufm_strip_html_and_contents( $theme_update ),
 				);
 			}
 			$themes_content .= '</ul>';
@@ -108,7 +88,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 			foreach ( $updates['core'] as $core_update ) {
 				$core_content .= ( '<li>' . $core_update . '</li>' );
 				$temlate_model->core_update[] = array(
-					'name' => $core_update,
+					'name' => baufm_strip_html_and_contents( $core_html ),
 				);
 			}
 			$core_content .= '</ul>';

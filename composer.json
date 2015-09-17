@@ -1,14 +1,23 @@
 {
     "name": "moxie/branded-auto-updates-for-mainwp",
     "description": "Provides a nice function that can be used like wp_mail() to send out emails to using PostMark.",
+    "keywords": ["wordpress", "branded-auto-updates-for-mainwp", "moxie"],
     "license": "GPLV2",
     "authors": [
         {
             "name": "Moxie",
             "email": "developer@getmoxied.net"
+        }, {
+            "name": "Dominique A. Mariano",
+            "email": "dominique.acpal.mariano@gmail.com"
         }
     ],
     "require": {
         "wildbit/postmark-php": "dev-master" 
+    },
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=5.4",
+        "composer/installers": "v1.0.21"
     }
 }

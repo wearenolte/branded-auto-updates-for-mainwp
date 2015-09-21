@@ -49,21 +49,31 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 
 	foreach ( $website_updates as $website_id => $updates ) {
 
-		$template_model  				= new stdClass();
-		$temlate_model->plugins_update 	= array();
-		$temlate_model->themes_update 	= array();
-		$temlate_model->core_update 	= array();
+		$template_model = new stdClass();
+
+		$template_model->plugins_update = array();
+		$template_model->themes_update = array();
+		$template_model->core_update = array();
+
+		// From last automatic update.
+		$template_model->from_date = date( 'd/m/Y', strtotime( 'last monday', time() ) );
+
+		// To current time.
+		$template_model->to_date = date( 'd/m/Y', time() );
+
+		$website = MainWPDB::Instance()->getWebsiteById( $website_id );
+
+		$template_model->site_url = $website->url;
 
 		MainWPLogger::Instance()->info( 'Website ID : ' . $website_id );
-		$website = MainWPDB::Instance()->getWebsiteById( $website_id );
-		$plugins_content = '';
 
+		$plugins_content = '';
 		if ( ! empty( $updates['plugins'] ) ) {
 			$plugins_content = '<div><strong>WordPress Plugin Updates</strong></div>';
 			$plugins_content .= '<ul>';
 			foreach ( $updates['plugins'] as $plugin_update ) {
 				$plugins_content .= ( '<li>' . $plugin_update . '</li>' );
-				$temlate_model->plugins_update[] = array(
+				$template_model->plugins_update[] = array(
 					'name' => baufm_strip_html_and_contents( $plugin_update ),
 				);
 			}
@@ -75,7 +85,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 			$themes_content .= '<ul>';
 			foreach ( $updates['themes'] as $theme_update ) {
 				$themes_content .= ( '<li>' . $theme_update . '</li>' );
-				$temlate_model->themes_update[] = array(
+				$template_model->themes_update[] = array(
 					'name' => baufm_strip_html_and_contents( $theme_update ),
 				);
 			}
@@ -87,7 +97,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 			$core_content .= '<ul>';
 			foreach ( $updates['core'] as $core_update ) {
 				$core_content .= ( '<li>' . $core_update . '</li>' );
-				$temlate_model->core_update[] = array(
+				$template_model->core_update[] = array(
 					'name' => baufm_strip_html_and_contents( $core_html ),
 				);
 			}
@@ -103,11 +113,10 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		if ( ! empty( $mail_content ) ) {
 			$mail_content = ( '<div>Following updates have been applied on your WordPress Site. (<a href="' . $website->url . '">' . $website->name . '</a>)</div>' . $mail_content );
 
-			$emails = MainWPDB::Instance()->getWebsiteOption( $website, 'mwp_me_emails' );
-			MainWPLogger::Instance()->info( var_export( $emails, true ) );
+			$emails = MainWPDB::Instance()->getWebsiteOption( $website, 'baufm_emails_after_offline_check' );
 
 			$emails = explode( ',', $emails );
-			MainWPLogger::Instance()->info( var_export( $emails, true ) );
+			MainWPLogger::Instance()->info( 'CRON :: emails ' . json_encode( $emails ) );
 
 			$server_token 		= get_option( 'baufm_config_server_token', '' );
 			$sender_signature 	= get_option( 'baufm_config_signature', '' );
@@ -129,7 +138,7 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 										$sender_signature,
 										$email,
 										$template,
-										$temlate_model
+										$template_model
 									);
 								} else {
 									$sendResult = $client->sendEmail(

@@ -54,8 +54,8 @@ function baufm_add_multiple_email_field( $website ) {
 	?>
   <tr>
     <th scope="row">
-		<?php _e( 'Notification Emails after Offline Checks', 'baufm' ); ?>
-		<?php MainWPUtility::renderToolTip( 'Add a list of comma-separated emails for multiple notifications.' ); ?>
+		<?php _e( 'Notification Emails', 'baufm' ); ?>
+		<?php MainWPUtility::renderToolTip( __( 'Add a list of comma-separated emails for multiple notifications.', 'baufm' ) ); ?>
     </th>
     <td>
 		<?php
@@ -70,3 +70,14 @@ function baufm_add_multiple_email_field( $website ) {
 	<?php
 }
 add_action( 'mainwp_extension_sites_edit_tablerow', 'baufm_add_multiple_email_field' );
+
+function baufm_update_site( $website_id ) {
+	$website = MainWPDB::Instance()->getWebsiteById( $website_id );
+	if ( ! empty( $_POST['baufm_emails_after_offline_check'] ) ) {
+		MainWPDB::Instance()->updateWebsiteOption( $website, 'baufm_emails_after_offline_check', trim( $_POST['baufm_emails_after_offline_check'] ) );
+	} else {
+		MainWPDB::Instance()->updateWebsiteOption( $website, 'baufm_emails_after_offline_check', '' );
+	}
+}
+add_action( 'mainwp_update_site', 'baufm_update_site' );
+

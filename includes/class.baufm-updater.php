@@ -195,10 +195,14 @@ class BAUFM_Updater {
 
 		// We will only deal with updates available for a particular group.
 		$updates_for_current_group = array();
+
+		unset( $website );
+
 		foreach ( $websites as $website ) {
 
 			// Get all the groups to which this particular website belongs to.
 			$website_in_groups = $this->get_group_by_site_id( $website->id );
+			MainWPLogger::Instance()->info( 'CRON :: website group ' . $current_group->name . ' of ID ' . $current_group->id . ' in groups ' . json_encode( $website_in_groups ) . ' count ' . count( $website_in_groups ) );
 
 			// We note that a site can belong to 0, 1, or more groups.
 			if ( in_array( $group_id, $website_in_groups ) ) {
@@ -826,6 +830,8 @@ class BAUFM_Updater {
 
 		$group_ids_obj = $wpdb->get_results( 'SELECT groupid FROM ' . $wpdb->prefix . 'mainwp_wp_group WHERE wpid = ' . $site_id );
 		$group_ids = array();
+
+		MainWPLogger::Instance()->info( 'CRON :: group ids obj is ' . json_encode( $group_ids_obj ) );
 
 		foreach ( $group_ids_obj as $group ) {
 			$group_ids[] = $group->groupid;

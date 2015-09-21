@@ -50,7 +50,7 @@ class BAUFM_Main {
 
 		require_once( ABSPATH . 'wp-admin/includes/plugin.php' );
 
-		if ( version_compare( $wp_version, BAUFM_WP_VERSION, '<' ) ) {
+		if ( version_compare( $wp_version, BAUFM_MIN_WP_VERSION, '<' ) ) {
 
 			deactivate_plugins( BAUFM_PLUGIN_NAME );
 

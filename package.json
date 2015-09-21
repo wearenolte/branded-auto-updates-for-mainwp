@@ -1,0 +1,36 @@
+{
+  "name": "branded-auto-updates-for-mainwp",
+  "version": "0.2.0",
+  "description": "Automatically upgrade different groups of sites on a daily or weekly basis, and send a branded email notification to multiple recipients afterward.",
+  "devDependencies": {
+    "coffeelint": "~1.6.0",
+    "grunt": "~0.4.5",
+    "grunt-coffeelint": "0.0.13",
+    "grunt-contrib-clean": "^0.6.0",
+    "grunt-contrib-coffee": "~0.11.1",
+    "grunt-contrib-compress": "^0.13.0",
+    "grunt-contrib-concat": "~0.4.0",
+    "grunt-contrib-copy": "^0.7.0",
+    "grunt-contrib-csslint": "~0.2.0",
+    "grunt-contrib-nodeunit": "~0.3.3",
+    "grunt-contrib-uglify": "~0.4.0",
+    "grunt-contrib-watch": "~0.6.1",
+    "grunt-scss-lint": "~0.1.11"
+  },
+  "main": "branded-auto-updates-for-mainwp.php",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:moxienyc/branded-auto-updates-for-mainwp.git"
+  },
+  "keywords": [
+    "baufm", "mainwp", "branded auto updates", "auto updates", "branded", "postmark"
+  ],
+  "author": "Dominique Mariano",
+  "license": "GPLv2"
+}

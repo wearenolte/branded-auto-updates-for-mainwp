@@ -274,11 +274,11 @@ if ( ! empty( $_REQUEST['options_action'] ) ) {
 	}
 
 	if ( 'clear_and_save' === $_REQUEST['options_action'] ) {
-		$nags[] = __( 'Options cleared. Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this WP Post Mark Emails.', 'baufm' );
+		$nags[] = __( 'Options cleared. Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this PostMark.', 'baufm' );
 	}
 } else {
 	if ( '' === get_option( 'baufm_config_server_token', '' ) && '' === get_option( 'baufm_config_signature', '' ) ) {
-		$nags[] = __( 'Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this WP Post Mark Emails.', 'baufm' );
+		$nags[] = __( 'Please supply a <strong>Server Token</strong> and a <strong>Sender Signature</strong> in order to use this PostMark.', 'baufm' );
 	}
 }
 

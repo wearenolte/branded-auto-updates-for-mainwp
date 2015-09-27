@@ -87,7 +87,7 @@
 							if ( (int) date_i18n( 'G' ) > (int) baufm_get_scheduled_time_of_day( $group->id, 'int' ) ) {
 								if ( date_i18n( 'd/m/Y', BAUFM_Updater::_instance()->get_last_scheduled_update_for_group( $group->id ) ) === date_i18n( 'd/m/Y' ) ) {
 									$next_automatic_update = sprintf( __( 'Tomorrow at %s %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ), date_i18n( 'e' ) );
-									$str_to_time = sprintf( __( 'tomorrow %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ) );									
+									$str_to_time = sprintf( __( 'tomorrow %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ) );
 								} else {
 									$next_automatic_update = sprintf( __( 'Today at %s %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ), date_i18n( 'e' ) );
 									$str_to_time = sprintf( __( 'today %s', 'baufm' ), baufm_get_scheduled_time_of_day( $group->id ) );

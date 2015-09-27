@@ -153,10 +153,12 @@ class BAUFM_Updater {
 		foreach ( $site_groups as $group ) {
 			MainWPLogger::Instance()->info( 'CRON :: get_scheduled_day_of_week ' .  $this->get_scheduled_day_of_week( $group->id ) . ' and now is ' . date_i18n( 'w' ) );
 			if ( $this->get_scheduled_day_of_week( $group->id ) === date_i18n( 'w' ) ) {
+				MainWPLogger::Instance()->info( 'CRON :: ' . (int) date_i18n( 'G' ) . ' > ' . (int) $this->get_scheduled_time_of_day( $group->id ) );
+
 				if ( (int) date_i18n( 'G' ) >= (int) $this->get_scheduled_time_of_day( $group->id ) ) {
 					if ( date_i18n( 'd/m/Y', $this->get_last_scheduled_update_for_group( $group->id ) ) === date_i18n( 'd/m/Y' ) ) {
 						// No action to take. Already updated.
-						MainWPLogger::Instance()->info( 'CRON :: updates check :: already updated today' );
+						MainWPLogger::Instance()->info( 'CRON :: updates check :: already updated today for group ' . $group->name );
 						continue;
 					} else {
 						// We should proceed with the update.
@@ -216,6 +218,7 @@ class BAUFM_Updater {
 		// Clear variables to free them for later use.
 		unset( $websites, $website, $website_in_groups );
 
+		update_option( "baufm_number_of_updates_for_group_$group_id", count( $updates_for_current_group ) );
 		// No updates for the current group.
 		if ( 0 === count( $updates_for_current_group ) ) {
 			MainWPLogger::Instance()->info( 'CRON :: updates check :: no updates for current group' . $group_id );

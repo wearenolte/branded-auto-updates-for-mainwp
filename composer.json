@@ -12,12 +12,10 @@
             "email": "dominique.acpal.mariano@gmail.com"
         }
     ],
-    "require": {
-        "wildbit/postmark-php": "dev-master" 
-    },
     "type": "wordpress-plugin",
     "require": {
         "php": ">=5.4",
-        "composer/installers": "v1.0.21"
+        "composer/installers": "v1.0.21",
+        "wildbit/postmark-php": "dev-master"
     }
 }

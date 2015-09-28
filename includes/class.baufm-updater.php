@@ -156,7 +156,7 @@ class BAUFM_Updater {
 				MainWPLogger::Instance()->info( 'CRON :: ' . (int) date_i18n( 'G' ) . ' > ' . (int) $this->get_scheduled_time_of_day( $group->id ) );
 
 				if ( (int) date_i18n( 'G' ) >= (int) $this->get_scheduled_time_of_day( $group->id ) ) {
-					if ( date_i18n( 'd/m/Y', $this->get_last_scheduled_update_for_group( $group->id ) ) === date_i18n( 'd/m/Y' ) ) {
+					if ( 0 !== (int) $this->get_last_scheduled_update_for_group( $group->id ) && date_i18n( 'd/m/Y', $this->get_last_scheduled_update_for_group( $group->id ) ) === date_i18n( 'd/m/Y' ) ) {
 						// No action to take. Already updated.
 						MainWPLogger::Instance()->info( 'CRON :: updates check :: already updated today for group ' . $group->name );
 						continue;

@@ -185,7 +185,7 @@ class BAUFM_Updater {
 		MainWPLogger::Instance()->info( 'CRON :: action to take for current group is ' . $do_what_for_group );
 
 		// All updates.
-		$websites = MainWPDB::Instance()->getWebsitesCheckUpdates( 4 );
+		$websites = MainWPDB::Instance()->getWebsitesCheckUpdates( 20 );
 
 		MainWPLogger::Instance()->info( 'CRON :: updates check found ' . count( $websites ) . ' website(s)' );
 

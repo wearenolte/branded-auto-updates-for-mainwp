@@ -152,7 +152,7 @@ class BAUFM_Updater {
 		// Loop through each site group and check if there is an update to do.
 		foreach ( $site_groups as $group ) {
 			MainWPLogger::Instance()->info( 'CRON :: get_scheduled_day_of_week ' .  $this->get_scheduled_day_of_week( $group->id ) . ' and now is ' . date_i18n( 'w' ) );
-			if ( $this->get_scheduled_day_of_week( $group->id ) === date_i18n( 'w' ) ) {
+			if ( ( baufm_get_scheduled_day_of_week( $group->id, 'int' ) - 2 ) === date_i18n( 'w' ) ) {
 				MainWPLogger::Instance()->info( 'CRON :: ' . (int) date_i18n( 'G' ) . ' > ' . (int) $this->get_scheduled_time_of_day( $group->id ) );
 
 				if ( (int) date_i18n( 'G' ) >= (int) $this->get_scheduled_time_of_day( $group->id ) ) {

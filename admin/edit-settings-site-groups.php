@@ -73,8 +73,6 @@
 
 				<td class="nextupdate column-nextupdate" data-colname="Next Update">
 					<?php
-					$last_automatic_update = MainWPDB::Instance()->getWebsitesLastAutomaticSync();
-					$update_count = count( MainWPDB::Instance()->getWebsitesCheckUpdates( 4 ) );
 
 					$daily_schedule = baufm_get_scheduled_day_of_week( $group->id, 'int' );
 					$is_off 	 	= ( 0 === $daily_schedule || ! $daily_schedule );

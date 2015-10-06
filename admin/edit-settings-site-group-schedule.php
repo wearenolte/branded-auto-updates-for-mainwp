@@ -74,7 +74,7 @@ $sheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
             <?php if ( 0 == $i ) : ?>
               <option value="0" <?php echo selected( $i, $schedule_in_day ); ?>>12:00 <?php echo $suffix; ?></option>
             <?php else : ?>
-              <option value="<?php echo $time; ?>" <?php echo selected( $i, $schedule_in_day ); ?>><?php echo $time; ?> <?php echo $suffix; ?></option>
+              <option value="<?php echo $i; ?>" <?php echo selected( $i, $schedule_in_day ); ?>><?php echo $time; ?> <?php echo $suffix; ?></option>
             <?php endif; ?>
 			<?php endfor; ?>
         </select>

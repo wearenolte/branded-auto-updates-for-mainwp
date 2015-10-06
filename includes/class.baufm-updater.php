@@ -50,7 +50,7 @@ class BAUFM_Updater {
 		add_action( 'init', array( $this, 'parse_init' ) );
 
 		// If we do not have anything scheduled.
-		if ( false == ( $sched = wp_next_scheduled( 'baufm_updater_cron_updates_check_action' ) ) ) {
+		if ( false === ( $sched = wp_next_scheduled( 'baufm_updater_cron_updates_check_action' ) ) ) {
 
 			// If we have nothing scheuled, and we are allowed to use WP cron, then schedule our task minutely.
 			if ( $use_wp_cron ) {

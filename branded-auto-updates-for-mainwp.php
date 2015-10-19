@@ -2,9 +2,9 @@
 /**
  * The main plugin file
  *
- * MainWP extention that give you the ability to automatically upgrade different
- * groups of sites on a daily or weekly basis, and send a branded email notification
- * to multiple recipients afterward.
+ * MainWP extension that gives you the ability to automatically upgrade 
+ * different groups of sites on a daily or weekly basis, and send a branded
+ * email notifications to multiple recipients afterwards.
  *
  * @since 0.1.0
  *
@@ -13,8 +13,8 @@
 
 /*
 Plugin Name: Branded Auto Updates for MainWP
-Description: Automatically upgrade different groups of sites on a daily or weekly basis, and send a branded email notification to multiple recipients afterward.
-Version: 0.2.0
+Description: Automatically upgrade different groups of sites on a daily or weekly basis, and send a branded email notification to multiple recipients afterwards.
+Version: 0.2.1
 Author: Moxie
 Author URI: http://getmoxied.net
 License: GPLv2 or later
@@ -53,16 +53,18 @@ define( 'BAUFM_MIN_WP_VERSION', '4.2.3' );
 define( 'BAUFM_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'BAUFM_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
-if ( ! class_exists( 'PostmarkClientBase' ) || ! class_exists( 'Postmark\PostmarkClientBase' ) ) {
-	// Autoload Composer modules. This will have to be replaced later.
-	include_once( 'vendor/autoload.php' );
-}
+// Danger zone. There is always a posibility of collision when using Composer.
+include_once( 'vendor/autoload.php' );
 
+// @todo Manage this better.
 include_once( 'includes/helpers-strings.php' );
 include_once( 'includes/helpers-mail.php' );
 include_once( 'includes/helpers-schedule.php' );
+
+include_once( 'includes/class.baufm-schedules.php' );
 include_once( 'includes/class.baufm-main.php' );
 include_once( 'includes/class.baufm-updater.php' );
+
 include_once( 'includes/notifications.php' );
 include_once( 'admin/admin.php' );
 

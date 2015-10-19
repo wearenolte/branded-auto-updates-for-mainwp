@@ -29,8 +29,8 @@ function baufm_create_plugin_menu_page() {
 function baufm_add_plugin_pages() {
 	add_submenu_page(
 		'mainwp_tab',
-		__( 'Main WP Automatic Updates', 'baufm' ),
-		__( 'Branded Updates', 'baufm' ),
+		esc_html__( 'Main WP Automatic Updates', 'baufm' ),
+		esc_html__( 'Branded Updates', 'baufm' ),
 		'manage_options',
 		'branded-auto-updates-for-mainwp',
 		'baufm_create_plugin_menu_page'
@@ -48,35 +48,53 @@ add_action( 'admin_menu', 'baufm_add_plugin_pages', 20 );
  * @author Udit Desai
  *
  * @todo This needs to be moved elsewhere since we are not even dealing
- * with offline checks in this plugin.
+ *       with offline checks in this plugin.
  */
 function baufm_add_multiple_email_field( $website ) {
 	?>
   <tr>
-    <th scope="row">
-		<?php _e( 'Notification Emails', 'baufm' ); ?>
-		<?php MainWPUtility::renderToolTip( __( 'Add a list of comma-separated emails for multiple notifications.', 'baufm' ) ); ?>
-    </th>
-    <td>
-		<?php
-		$emails = MainWPDB::Instance()->getWebsiteOption( $website, 'baufm_emails_after_offline_check' );
-		if ( empty( $emails ) ) {
-			$emails = '';
-		}
-		?>
-      <textarea style="height: 140px; width: 100%;" name="baufm_emails_after_offline_check" id="baufm_emails_after_offline_check"><?php esc_html_e( $emails ); ?></textarea>
-    </td>
-  </tr>
-	<?php
+  <th scope="row">
+    <?php
+	esc_html_e( 'Notification Emails', 'baufm' );
+
+	MainWPUtility::renderToolTip(
+		esc_html__( 'Enter a list of comma-separated emails.', 'baufm' )
+	);
+	?>
+  </th>
+  <td>
+    <?php
+	/*
+     * @todo Shorten the name and remove reference to 'offline'.
+     * @todo Write a delta update once you do that.
+     */
+	$emails = MainWPDB::Instance()->getWebsiteOption( $website, 'baufm_emails_after_offline_check' );
+
+	if ( empty( $emails ) ) {
+		$emails = '';
+	}
+	?>
+    <textarea name="baufm_emails_after_offline_check"><?php esc_html_e( $emails ); ?></textarea>
+  </td>
+  </tr><?php
 }
 add_action( 'mainwp_extension_sites_edit_tablerow', 'baufm_add_multiple_email_field' );
 
 function baufm_update_site( $website_id ) {
 	$website = MainWPDB::Instance()->getWebsiteById( $website_id );
+
 	if ( ! empty( $_POST['baufm_emails_after_offline_check'] ) ) {
-		MainWPDB::Instance()->updateWebsiteOption( $website, 'baufm_emails_after_offline_check', trim( $_POST['baufm_emails_after_offline_check'] ) );
+		MainWPDB::Instance()->updateWebsiteOption(
+			$website,
+			'baufm_emails_after_offline_check',
+			trim( $_POST['baufm_emails_after_offline_check'] )
+		);
 	} else {
-		MainWPDB::Instance()->updateWebsiteOption( $website, 'baufm_emails_after_offline_check', '' );
+		MainWPDB::Instance()->updateWebsiteOption(
+			$website,
+			'baufm_emails_after_offline_check',
+			''
+		);
 	}
 }
 add_action( 'mainwp_update_site', 'baufm_update_site' );

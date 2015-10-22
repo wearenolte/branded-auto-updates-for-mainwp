@@ -2,7 +2,7 @@
 /**
  * The main plugin file
  *
- * MainWP extension that gives you the ability to automatically upgrade 
+ * MainWP extension that gives you the ability to automatically upgrade
  * different groups of sites on a daily or weekly basis, and send a branded
  * email notifications to multiple recipients afterwards.
  *

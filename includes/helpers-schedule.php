@@ -1,23 +1,12 @@
 <?php
-
 /**
+ * Get the 12-hour time equivalent of a 24-hour time input.
  *
- */
-function baufm_get_scheduled_day_of_week( $group_id, $format = 'text' ) {
-	$schedule_in_week = (int) get_option( "baufm_schedule_in_week_group_$group_id", 0 );
-
-	if ( 'int' === $format ) {
-		return $schedule_in_week;
-	}
-
-	if ( 'text' === $format ) {
-		return baufm_format_scheduled_day_of_week( $schedule_in_week );
-	}
-
-}
-
-/**
+ * @todo Remove this function.
  *
+ * @deprecated 0.2.0
+ *
+ * @param $_24_hour_time
  */
 function baufm_format_scheduled_time_of_day( $_24_hour_time ) {
 	$suffix = ( $_24_hour_time >= 12 ) ? 'PM' : 'AM';
@@ -29,34 +18,15 @@ function baufm_format_scheduled_time_of_day( $_24_hour_time ) {
 }
 
 /**
+ * Callback function for updating the child sites belonging to a given group
+ * at the current time.
  *
+ * @todo Remove this temporary function and replace it.
+ *
+ * @since 0.2.0
  */
-function baufm_format_scheduled_day_of_week( $schedule_in_week ) {
-	$days = array(
-		__( 'Nothing scheduled.', 'baufm' ),
-		__( 'Everyday', 'baufm' ),
-		__( 'Sunday' , 'baufm' ),
-		__( 'Monday', 'baufm' ),
-		__( 'Tuesday', 'baufm' ),
-		__( 'Wednesday', 'baufm' ),
-		__( 'Thursday', 'baufm' ),
-		__( 'Friday', 'baufm' ),
-		__( 'Saturday', 'baufm' ),
-	);
-
-	if ( ! array_key_exists( $schedule_in_week, $days ) ) {
-		$schedule_in_week = 0;
-	}
-
-	return $days[ $schedule_in_week ];
+function _baufm_update_now( $group_id, $scheduled_action ) {
+	BAUFM_Updater::_instance()->pre_update_setup();
+	BAUFM_Updater::_instance()->update_group( $group_id, $scheduled_action );
 }
-
-function baufm_get_scheduled_time_of_day( $group_id, $format = 'text' ) {
-	$schedule_in_day = get_option( "baufm_schedule_in_day_group_$group_id", 0 );
-
-	if ( 'int' === $format ) {
-		return $schedule_in_day;
-	}
-
-	return baufm_format_scheduled_time_of_day( $schedule_in_day );
-}
+add_action( 'baufm_update_now', '_baufm_update_now', 10, 2 );

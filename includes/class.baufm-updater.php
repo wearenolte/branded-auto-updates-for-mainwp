@@ -7,10 +7,6 @@
  * @package Branded_Auto_Updates_For_MainWP
  */
 
-if ( '' === session_id() ) {
-	session_start();
-}
-
 /**
  * Class for handling automatic weekly batch updates.
  *
@@ -183,14 +179,14 @@ class BAUFM_Updater {
 
 		foreach ( $updates_for_current_group as $website ) {
 			$website_values = array(
-				'dtsAutomaticSyncStart' => time(),
+				'dtsAutomaticSyncStart' => 0,
 			);
 
 			if ( null === $user_id ) {
 				$user_id = $website->userid;
 			}
 
-			// MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, $website_values );
+			MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, $website_values );
 		}
 
 		return $user_id;
@@ -286,13 +282,13 @@ class BAUFM_Updater {
 					$website_decoded_ignored_themes = array();
 				}
 
-				// Perform check and update.
+				// Make sure updates are always ready..
 				if ( ! MainWPSync::syncSite( $website, false, true ) ) {
 					$website_values = array(
-						'dtsAutomaticSync' => time(),
+						'dtsAutomaticSync' => 0,
 					);
 
-					//MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, $website_values );
+					MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, $website_values );
 					continue;
 				}
 
@@ -452,7 +448,7 @@ class BAUFM_Updater {
 
 				MainWPUtility::update_option( 'mainwp_updatescheck_mail_email', $email );
 
-				//MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, array( 'dtsAutomaticSync' => time() ) );
+				MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, array( 'dtsAutomaticSync' => 0 ) );
 				MainWPDB::Instance()->updateWebsiteOption( $website, 'last_wp_upgrades', json_encode( $website_core_upgrades ) );
 				MainWPDB::Instance()->updateWebsiteOption( $website, 'last_plugin_upgrades', $website->plugin_upgrades );
 				MainWPDB::Instance()->updateWebsiteOption( $website, 'last_theme_upgrades', $website->theme_upgrades );

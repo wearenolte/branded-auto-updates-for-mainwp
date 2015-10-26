@@ -78,7 +78,7 @@ if ( $do_action ) {
 	$really = check_admin_referer( 'baufm_settings_nonce' );
 
 	// Construct the send back url.
-	$send_back = remove_query_arg( array_keys( $actions ), wp_get_referer() );
+	$send_back = remove_query_arg( $actions, wp_get_referer() );
 
 	if ( ! $send_back ) {
 		$send_back = self_admin_url( $parent_file );
@@ -261,18 +261,9 @@ if ( $do_action ) {
 			$group_id	= isset( $_REQUEST['group-id'] ) ? absint( $_REQUEST['group-id'] ) : false; // Input var okay.
 			$scheduled_action	= isset( $_REQUEST['scheduled_action'] ) ? absint( $_REQUEST['scheduled_action'] ) : false;
 
-			BAUFM_Updater::_instance()->pre_update_setup();
-			BAUFM_Updater::_instance()->update_group( $group_id, $scheduled_action );
-			MainWPLogger::Instance()->info( "CRON :: Started manual update for group $group_id." );
-
-			$query_args = array(
-				'group-id',
-				'scheduled_action',
-				'baufm_update_now',
-			);
+			wp_schedule_single_event( time(), 'baufm_update_now', array( $group_id, $scheduled_action ) );
 
 			$send_back = remove_query_arg( $query_args, $send_back );
-			unset( $query_args );
 			break;
 
 		default:

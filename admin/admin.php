@@ -80,6 +80,32 @@ function baufm_add_multiple_email_field( $website ) {
 }
 add_action( 'mainwp_extension_sites_edit_tablerow', 'baufm_add_multiple_email_field' );
 
+function baufm_add_mirror_site_url( $website ) {
+	?>
+  <tr>
+  <th scope="row">
+    <?php
+	  esc_html_e( 'Mirror Site URL', 'baufm' );
+
+	  MainWPUtility::renderToolTip(
+	esc_html__( 'Enter the mirror site associated with this site.', 'baufm' )
+	  );
+	?>
+  </th>
+  <td>
+    <?php
+	  $mirror_site_url = MainWPDB::Instance()->getWebsiteOption( $website, 'baufm_mirror_site_url' );
+
+	  if ( empty( $mirror_site_url ) ) {
+	$mirror_site_url = '';
+	  }
+	?>
+    <input name="baufm_mirror_site_url" value="<?php echo esc_url( $mirror_site_url ); ?>" >
+  </td>
+  </tr><?php
+}
+add_action( 'mainwp_extension_sites_edit_tablerow', 'baufm_add_mirror_site_url' );
+
 function baufm_update_site( $website_id ) {
 	$website = MainWPDB::Instance()->getWebsiteById( $website_id );
 
@@ -96,6 +122,19 @@ function baufm_update_site( $website_id ) {
 			''
 		);
 	}
+
+	if ( ! empty( $_POST['baufm_mirror_site_url'] ) ) {
+		MainWPDB::Instance()->updateWebsiteOption(
+			$website,
+			'baufm_mirror_site_url',
+			trim( $_POST['baufm_mirror_site_url'] )
+		);
+	} else {
+		MainWPDB::Instance()->updateWebsiteOption(
+			$website,
+			'baufm_mirror_site_url',
+			''
+		);
+	}
 }
 add_action( 'mainwp_update_site', 'baufm_update_site' );
-

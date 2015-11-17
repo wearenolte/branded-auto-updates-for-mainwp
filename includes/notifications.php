@@ -62,10 +62,10 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$template_model->to_date = date( 'd/m/Y', time() );
 
 		$website = MainWPDB::Instance()->getWebsiteById( $website_id );
+		$mirror_site_url = MainWPDB::Instance()->getWebsiteOption( $website, 'baufm_mirror_site_url' );
 
 		$template_model->site_url = $website->url;
-		$template_model->staging_site_url = $website->url;
-		$template_model->production_site_url = $website->url;
+		$template_model->mirror_site_url = $mirror_site_url;
 
 		MainWPLogger::Instance()->info( 'Website ID : ' . $website_id );
 

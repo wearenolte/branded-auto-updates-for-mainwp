@@ -17,5 +17,14 @@
         "php": ">=5.4",
         "composer/installers": "v1.0.21",
         "wildbit/postmark-php": "dev-master"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "2.*",
+        "wp-coding-standards/wpcs": "dev-master"
+    },
+    "scripts": {
+        "post-install-cmd": [
+          "vendor/bin/phpcs --config-set installed_paths vendor/wp-coding-standards/wpcs/"
+        ]
     }
 }

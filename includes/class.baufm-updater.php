@@ -7,54 +7,64 @@
  * @package Branded_Auto_Updates_For_MainWP
  */
 
-if ( session_id() == '' ) { session_start(); }
-ini_set( 'display_errors', true );
-error_reporting( E_ALL | E_STRICT );
-
 /**
  * Class for handling automatic weekly batch updates.
+ *
+ * @since 0.2.0
  */
 class BAUFM_Updater {
-	// Singleton.
-	private static $instance = null;
+
+	/**
+	 * Singleton.
+	 *
+	 * @since 0.2.0
+	 * @var BAUFM_Updater
+	 */
+	private static $instance;
 
 	/**
 	 * Return the instance of the current object of this class.
 	 *
+	 * @since 0.2.0
+	 *
 	 * @static
-	 * @return BAUFM_Updater
+	 * @return BAUFM_Updater Singleton instance of this class.
 	 */
 	static function _instance() {
 		return self::$instance;
 	}
 
 	/**
-	 * Constructor.
+	 * PHP5 Constructor.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @return void
 	 */
 	public function __construct() {
 
 		// Make our instance available on static calls.
-		BAUFM_Updater::$instance = $this;
+		self::$instance = $this;
 
 		// Use the cron schedules added by MainWP.
 		add_filter( 'cron_schedules', array( 'MainWPUtility', 'getCronSchedules' ) );
 
-		// Check if MainWP is set to use WP Cron.
-		$use_wp_cron = get_option( 'mainwp_wp_cron' );
-
-		do_action( 'mainwp_cronload_action' );
-
 		// Call back action for use with WP scheduled events that runs every minute.
-		add_action( 'baufm_updater_cron_updates_check_action', array( $this, 'baufm_updater_cron_updates_check_action' ) );
+		add_action( 'baufm_check_for_updates_action', array( &$this, 'check_for_updates' ) );
 
 		add_action( 'init', array( $this, 'parse_init' ) );
 
+	  do_action( 'mainwp_cronload_action' );
+
+		// Check if MainWP is set to use WP Cron.
+		$use_wp_cron = get_option( 'mainwp_wp_cron' );
+
 		// If we do not have anything scheduled.
-		if ( false == ( $sched = wp_next_scheduled( 'baufm_updater_cron_updates_check_action' ) ) ) {
+		if ( false === ( $sched = wp_next_scheduled( 'baufm_check_for_updates_action' ) ) ) {
 
 			// If we have nothing scheuled, and we are allowed to use WP cron, then schedule our task minutely.
 			if ( $use_wp_cron ) {
-				wp_schedule_event( time(), 'minutely', 'baufm_updater_cron_updates_check_action' );
+				wp_schedule_event( time(), 'minutely', 'baufm_check_for_updates_action' );
 			}
 
 			// If we have something scheduled.
@@ -62,223 +72,134 @@ class BAUFM_Updater {
 
 			// If we have something scheduled and we are not allowed to user WP cron, then un-schedule it.
 			if ( ! $use_wp_cron ) {
-				wp_unschedule_event( $sched, 'baufm_updater_cron_updates_check_action' );
+				wp_unschedule_event( $sched, 'baufm_check_for_updates_action' );
 			}
 		}
 	}
 
-	/**
-	 *
-	 */
-	public function get_scheduled_day_of_week( $group_id ) {
-		$schedule_in_week = (int) get_option( "baufm_schedule_in_week_group_$group_id", 0 );
+	public function get_updates_for_current_group( $group_id, $limit = 50 ) {
 
-		$days = array(
-			'Sunday',
-			'Monday',
-			'Tuesday',
-			'Wednesday',
-			'Thursday',
-			'Friday',
-			'Saturday',
-		);
+		// All updates. @todo Write our own DB class for this.
+		$websites = MainWPDB::Instance()->getWebsitesCheckUpdates( $limit );
 
-		if ( $schedule_in_week >= 2 ) {
-			$day = $schedule_in_week - 2;
-			return $days[ $day ];
+		MainWPLogger::Instance()->info( count( $websites ) . ' updates available.' );
+
+		// Surely, we have a list right.
+		if ( 0 === count( $websites ) ) {
+			return array();
 		}
 
-		if ( 1 === $schedule_in_week ) {
-			return date_i18n( 'w' );
+		// We will only deal with updates available for a particular group.
+		$updates = array();
+
+		foreach ( $websites as $website ) {
+			// Get all the groups to which this particular website belongs to.
+			$website_in_groups = $this->get_group_by_site_id( $website->id );
+
+			// We note that a site can belong to 0, 1, or more groups.
+			if ( in_array( $group_id, $website_in_groups ) ) {
+				$updates[] = $website;
+			}
 		}
 
-		return 0;
+		return $updates;
 	}
 
-	/**
-	 *
-	 */
-	public function set_scheduled_day_of_week( $group_id, $timestamp ) {
-		update_option( "baufm_schedule_in_week_group_$group_id", $timestamp );
-	}
-
-	/**
-	 *
-	 */
-	public function get_scheduled_time_of_day( $group_id ) {
-		return get_option( "baufm_schedule_in_day_group_$group_id", 0 );
-	}
-
-	/**
-	 *
-	 */
-	public function get_last_scheduled_update_for_group( $group_id ) {
-		return get_option( "baufm_last_scheduled_update_$group_id" );
-	}
-
-	/**
-	 *
-	 */
-	public function set_last_scheduled_update_for_group( $group_id, $timestamp ) {
-		update_option( "baufm_last_scheduled_update_$group_id", $timestamp );
-	}
-
-	/**
-	 *
-	 */
-	public function baufm_updater_cron_updates_check_action() {
-
-		MainWPLogger::Instance()->info( 'CRON :: updates check' );
-
+	public function pre_update_setup() {
 		ignore_user_abort( true );
 		set_time_limit( 0 );
 		$mem = '512M';
 		ini_set( 'memory_limit', $mem );
 		ini_set( 'max_execution_time', 0 );
+	}
+
+	/**
+	 * @since 0.2.0
+	 */
+	public function check_for_updates() {
+
+		$this->pre_update_setup();
 
 		// Used in MainWPServerInformation.page.php for display purposes only.
 		MainWPUtility::update_option( 'mainwp_cron_last_updatescheck', time() );
 
 		// We will only deal with batch, or grouped updates FOR NOW.
-		$site_groups = MainWPDB::Instance()->getNotEmptyGroups();
-
-		MainWPLogger::Instance()->info( 'CRON :: found ' . count( $site_groups ) . ' site groups' );
-
-		if ( 0 == count( $site_groups ) ) {
-			MainWPLogger::Instance()->info( 'CRON :: no site group found, exit now' );
-			return;
-		}
-
-		// Loop through each site group and check if there is an update to do.
-		foreach ( $site_groups as $group ) {
-			MainWPLogger::Instance()->info( 'CRON :: get_scheduled_day_of_week ' .  ( baufm_get_scheduled_day_of_week( $group->id, 'int' ) - 2 ) . ' and now is ' . date_i18n( 'w' ) );
-			if ( ( (int) baufm_get_scheduled_day_of_week( $group->id, 'int' ) - 2 ) === (int) date_i18n( 'w' ) ) {
-				MainWPLogger::Instance()->info( 'CRON :: ' . (int) date_i18n( 'G' ) . ' > ' . (int) $this->get_scheduled_time_of_day( $group->id ) );
-
-				if ( (int) date_i18n( 'G' ) >= (int) $this->get_scheduled_time_of_day( $group->id ) ) {
-					if ( 0 !== (int) $this->get_last_scheduled_update_for_group( $group->id ) && date_i18n( 'd/m/Y', $this->get_last_scheduled_update_for_group( $group->id ) ) === date_i18n( 'd/m/Y' ) ) {
-						// No action to take. Already updated.
-						MainWPLogger::Instance()->info( 'CRON :: updates check :: already updated today for group ' . $group->name );
-						continue;
-					} else {
-						// We should proceed with the update.
-						$current_group = $group;
-						MainWPLogger::Instance()->info( 'CRON :: ' .  $current_group->name . ' is scheduled now at ' . time() );
-						break;
-					}
-				}
-			}
-		}
+		$groups = MainWPDB::Instance()->getNotEmptyGroups();
 
 		// We don't have a group. No batch update to make.
-		if ( ! isset( $current_group ) ) {
-			MainWPLogger::Instance()->info( 'CRON :: found no group currently scheduled this ' . date_i18n( 'l' ) . ' ' . date_i18n( 'G' ) );
+		if ( empty( $groups ) ) {
+			MainWPLogger::Instance()->info( 'CRON :: We dont have a group.' );
 			return;
 		}
 
-		// The group ID of the current group.
-		$group_id = $current_group->id;
-		MainWPLogger::Instance()->info( 'CRON :: current group ID is ' . $group_id );
+		// The current group scheduled now.
+		$group = BAUFM_Schedules::get_group_scheduled_now( $groups );
 
-		// Action to take when an update is available: None, email updates, or update sites.
-		$do_what_for_group = get_option( "baufm_scheduled_action_group_$group_id" );
-		MainWPLogger::Instance()->info( 'CRON :: action to take for current group is ' . $do_what_for_group );
-
-		// All updates.
-		$websites = MainWPDB::Instance()->getWebsitesCheckUpdates( 20 );
-
-		MainWPLogger::Instance()->info( 'CRON :: updates check found ' . count( $websites ) . ' website(s)' );
-
-		// Surely, we have a list right.
-		if ( 0 === count( $websites ) ) {
-			MainWPLogger::Instance()->info( 'CRON :: we have no updates, exit' );
-			return;
-		}
-
-		// We will only deal with updates available for a particular group.
-		$updates_for_current_group = array();
-
-		unset( $website );
-
-		foreach ( $websites as $website ) {
-
-			// Get all the groups to which this particular website belongs to.
-			$website_in_groups = $this->get_group_by_site_id( $website->id );
-			MainWPLogger::Instance()->info( 'CRON :: website group ' . $current_group->name . ' of ID ' . $current_group->id . ' in groups ' . json_encode( $website_in_groups ) . ' count ' . count( $website_in_groups ) );
-
-			// We note that a site can belong to 0, 1, or more groups.
-			if ( in_array( $group_id, $website_in_groups ) ) {
-				MainWPLogger::Instance()->info( 'CRON :: site with ID ' . $website->id . ' belongs to ' . $current_group->name . ', continue' );
-				$updates_for_current_group[] = $website;
-			} else {
-				MainWPLogger::Instance()->info( 'CRON :: site with ID ' . $website->id . ' does not belong to ' . $current_group->name . ', exit' );
-			}
-		}
-
-		// Clear variables to free them for later use.
-		unset( $websites, $website, $website_in_groups );
-
-		update_option( "baufm_number_of_updates_for_group_$group_id", count( $updates_for_current_group ) );
-		// No updates for the current group.
-		if ( 0 === count( $updates_for_current_group ) ) {
-			MainWPLogger::Instance()->info( 'CRON :: updates check :: no updates for current group' . $group_id );
+		// We don't have a group scheduled now.
+		if ( empty( $group ) ) {
+			MainWPLogger::Instance()->info( 'CRON :: No group scheduled now.' );
 			return;
 		}
 
 		/*
-         * Each site has an associated user_id, which is points to info about trusted/ignored/conflicting updates.
-         * Use the first user_id we encounter.
-         */
+		 * Action to take when an update is available:
+		 * None, email updates, or update sites.
+		 */
+		$action = get_option( "baufm_scheduled_action_group_{$group->id}" );
+
+		$this->update_group( $group->id, $action );
+	}
+
+	public function update_group( $group_id, $action ) {
+		MainWPLogger::Instance()->info( "CRON :: Calling update_group $group_id." );
+
+		$updates = $this->get_updates_for_current_group( $group_id );
+
+		// No updates for the current group.
+		if ( 0 === count( $updates ) ) {
+			MainWPLogger::Instance()->info( "CRON :: No update for group $group_id." );
+			return;
+		}
+
+		$user_id = $this->get_user_id( $updates );
+		MainWPLogger::Instance()->info( 'CRON :: Applying updates.' );
+
+		$this->apply_updates( $updates, $user_id, $group_id, $action );
+	}
+
+	/**
+	 * Each site has an associated user_id, which is points to info about trusted/ignored/conflicting updates.
+	 * Use the first user_id we encounter.
+	 *
+	 * @since 0.2.0
+	 */
+	private function get_user_id( array $updates_for_current_group ) {
+
 		$user_id = null;
+
 		foreach ( $updates_for_current_group as $website ) {
 			$website_values = array(
-				'dtsAutomaticSyncStart' => time(),
+				'dtsAutomaticSyncStart' => 0,
 			);
 
 			if ( null === $user_id ) {
-				MainWPLogger::Instance()->info( 'CRON :: ' . $website->userid .  ' as user id' );
 				$user_id = $website->userid;
 			}
 
-			MainWPLogger::Instance()->info( 'CRON :: updating website sync values for website id ' . $website->id );
 			MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, $website_values );
 		}
 
-		// We'll use this variable again, so clear it.
-		unset( $website, $website_values );
+		return $user_id;
+	}
 
-		// If we have no updates for the current group.
-		if ( 0 === count( $updates_for_current_group ) ) {
-			MainWPLogger::Instance()->info( 'CRON :: no updates for current group ' );
+	/**
+	 *
+	 *
+	 * @since 0.2.0
+	 */
+	public function apply_updates( array $updates, $user_id, $group_id, $action ) {
 
-			$busy_counter = MainWPDB::Instance()->getWebsitesCountWhereDtsAutomaticSyncSmallerThenStart();
-			MainWPLogger::Instance()->info( 'CRON :: busy counter is ' . $busy_counter );
-
-			if ( 0 === $busy_counter ) {
-				MainWPLogger::Instance()->info( 'CRON :: updates check :: got to the mail part' );
-
-				MainWPUtility::update_option( "mainwp_automaticUpdate_backupChecks_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_core_new_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_plugins_new_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_themes_new_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_core_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_plugins_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_themes_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_core_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_plugins_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_themes_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_core_new_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_plugins_new_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_themes_new_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_pluginconflicts_$group_id", '' );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_themeconflicts_$group_id", '' );
-
-				MainWPLogger::Instance()->info( 'CRON :: setting last scheduled update for ' . $group_id . ' as ' . date( 'd/m/Y' ) );
-				$this->set_last_scheduled_update_for_group( $group_id, time() ); // date( 'd/m/Y' )
-			}
-		} else {
-
-			MainWPLogger::Instance()->info( 'CRON :: got to the updates part' );
+		  MainWPLogger::Instance()->info( 'CRON :: Attempting updates.' );
 
 			/**
 			 * In MainWP, the mainwp_users table lists the trusted/ignored/dismissed
@@ -287,33 +208,31 @@ class BAUFM_Updater {
 			 */
 			$user_extension = MainWPDB::Instance()->getUserExtensionByUserId( $user_id );
 
+			MainWPLogger::Instance()->info( 'CRON :: User extension is ' . wp_json_encode( $user_extension ) );
+
 			// Get the ignored plugins.
 			$decoded_ignored_plugins = json_decode( $user_extension->ignored_plugins, true );
 			if ( ! is_array( $decoded_ignored_plugins ) ) {
 				$decoded_ignored_plugins = array();
 			}
-			MainWPLogger::Instance()->info( 'CRON :: ignored plugins are ' .  var_export( $decoded_ignored_plugins ) );
 
 			// Get the trusted plugins.
 			$trusted_plugins = json_decode( $user_extension->trusted_plugins, true );
 			if ( ! is_array( $trusted_plugins ) ) {
 				$trusted_plugins = array();
 			}
-			MainWPLogger::Instance()->info( 'CRON :: ' . count( $trusted_plugins ) . 'trusted plugins are ' .  var_export( $trusted_plugins ) );
 
 			// Get the ignored themes.
 			$decoded_ignored_themes = json_decode( $user_extension->ignored_themes, true );
 			if ( ! is_array( $decoded_ignored_themes ) ) {
 				$decoded_ignored_themes = array();
 			}
-			MainWPLogger::Instance()->info( 'CRON :: ignored themes are ' .  var_export( $decoded_ignored_themes ) );
 
 			// Get the trusted themes.
 			$trusted_themes = json_decode( $user_extension->trusted_themes, true );
 			if ( ! is_array( $trusted_themes ) ) {
 				$trusted_themes = array();
 			}
-			MainWPLogger::Instance()->info( 'CRON :: trusted themes are ' .  var_export( $trusted_themes ) );
 
 			// Core updates.
 			$core_to_update_now         = array();
@@ -346,113 +265,77 @@ class BAUFM_Updater {
 			$info_trusted_text          = ' (<span style="color:#008000"><strong>Trusted</strong></span>)';
 			$info_not_trusted_text      = ' (<strong><span style="color:#ff0000">Not Trusted</span></strong>)';
 
+			MainWPLogger::Instance()->info( 'CRON :: Beginning loop on current group.' );
+
 			// Go over each website in our current group.
-			foreach ( $updates_for_current_group as $website ) {
-				MainWPLogger::Instance()->info( 'CRON :: looping through each website on the current group ' . $group_id );
+			foreach ( $updates as $website ) {
 
 				// Get the ignored plugins.
 				$website_decoded_ignored_plugins = json_decode( $website->ignored_plugins, true );
 				if ( ! is_array( $website_decoded_ignored_plugins ) ) {
 					$website_decoded_ignored_plugins = array();
 				}
-				MainWPLogger::Instance()->info( 'CRON :: ignored plugins for site ' . $website->id . ' ' . var_export( $website_decoded_ignored_plugins ) );
 
 				// Get the ignored themes.
 				$website_decoded_ignored_themes = json_decode( $website->ignored_themes, true );
 				if ( ! is_array( $website_decoded_ignored_themes ) ) {
 					$website_decoded_ignored_themes = array();
 				}
-				MainWPLogger::Instance()->info( 'CRON :: ignored themes for site ' . $website->id . ' ' . var_export( $website_decoded_ignored_themes ) );
 
-				// Perform check and update.
+				// Make sure updates are always ready..
 				if ( ! MainWPSync::syncSite( $website, false, true ) ) {
 					$website_values = array(
-						'dtsAutomaticSync' => time(),
+						'dtsAutomaticSync' => 0,
 					);
 
-					MainWPLogger::Instance()->info( 'CRON :: sync site ' . $website->id );
 					MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, $website_values );
-
 					continue;
 				}
 
 				$website = MainWPDB::Instance()->getWebsiteById( $website->id );
-				MainWPLogger::Instance()->info( 'CRON :: checking info for ' . $website->id );
 
 				// Check core upgrades.
 				$website_last_core_upgrades = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'last_wp_upgrades' ), true );
-				MainWPLogger::Instance()->info( 'CRON :: last wp upgrade for ' . $website->id  . ' is ' . var_export( $website_last_core_upgrades ) );
-
 				$website_core_upgrades      = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'wp_upgrades' ), true );
-				MainWPLogger::Instance()->info( 'CRON :: wp upgrades for ' . $website->id  . ' is ' . var_export( $website_core_upgrades ) );
 
 				// Run over every update we had last time.
 				if ( isset( $website_core_upgrades['current'] ) ) {
-					MainWPLogger::Instance()->info( 'CRON :: run over every update we had last time' );
-
 					$info_txt     = '<a href="' . admin_url( 'admin.php?page=managesites&dashboard=' . $website->id ) . '">' . $website->name . '</a> - ' . $website_core_upgrades['current'] . ' to ' . $website_core_upgrades['new'];
 					$info_new_txt = '*NEW* <a href="' . admin_url( 'admin.php?page=managesites&dashboard=' . $website->id ) . '">' . $website->name . '</a> - ' . $website_core_upgrades['current'] . ' to ' . $website_core_upgrades['new'];
 					$new_update   = ! ( isset( $website_last_core_upgrades['current'] ) && ( $website_last_core_upgrades['current'] == $website_core_upgrades['current'] ) && ( $website_last_core_upgrades['new'] == $website_core_upgrades['new'] ) );
-					MainWPLogger::Instance()->info( 'CRON :: we have a new update :: ' . ( $new_update ) ? 'yes' : 'no' );
-
-					$do_what_for_group = apply_filters( 'baufm_do_what_for_group', $do_what_for_group, $website->id, $group_id );
-					MainWPLogger::Instance()->info( 'CRON :: do what for group ' . $group_id . ' ::: ' . $do_what_for_group );
 
 					// If we are OK to install trusted updates.
-					if ( in_array( $do_what_for_group, array( 2, 3 ) ) ) {
-						MainWPLogger::Instance()->info( 'CRON :: we are ok to install trusted updates' );
-
+					if ( in_array( $action, array( 2, 3 ) ) ) {
 						// If we have a new update.
 						if ( $new_update ) {
 							$core_new_update[] = array( $website->id, $info_new_txt, $info_trusted_text );
-							MainWPLogger::Instance()->info( 'CRON :: we have new update for core ' . var_export( $core_new_update ) );
-
 						} else {
 							// Check ignore ? $ignored_core_to_update.
 							$core_to_update_now[]           = $website->id;
 							$all_websites[ $website->id ]   = $website;
 							$core_to_update[]               = array( $website->id, $info_txt, $info_trusted_text );
-
-							MainWPLogger::Instance()->info( 'CRON :: core to update now ' . var_export( $core_to_update_now ) );
-							MainWPLogger::Instance()->info( 'CRON :: all websites ' . var_export( $all_websites ) );
-							MainWPLogger::Instance()->info( 'CRON :: core to update ' . var_export( $core_to_update ) );
 						}
-
 						// Nope, we're either set to just email updates for approval or do nothing.
 					} else {
-						MainWPLogger::Instance()->info( 'CRON :: we will not install trusted updates' );
-
 						if ( $new_update ) {
 							$ignored_core_new_update[] = array( $website->id, $info_new_txt, $info_not_trusted_text );
-							MainWPLogger::Instance()->info( 'CRON :: new update, but ignored core new update ', var_export( $ignored_core_new_update ) );
 						} else {
 							$ignored_core_to_update[] = array( $website->id, $info_txt, $info_not_trusted_text );
-							MainWPLogger::Instance()->info( 'CRON :: no new update, ignored core to update for ' . $website->id . ' ' . var_export( $ignored_core_to_update ) );
 						}
 					}
 				}
 
 				// Check plugins.
 				$website_last_plugins = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'last_plugin_upgrades' ), true );
-				MainWPLogger::Instance()->info( 'CRON :: website last plugin upgrades for ' . $website->id . ' ' . var_export( $website_last_plugins ) );
-
 				$website_plugins = json_decode( $website->plugin_upgrades, true );
-				MainWPLogger::Instance()->info( 'CRON :: website plugin upgrade for ' . $website->id . ' ' . var_export( $website_plugins ) );
 
 				// Check themes.
 				$website_last_themes = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'last_theme_upgrades' ), true );
-				MainWPLogger::Instance()->info( 'CRON :: website last theme upgrades for' . $website->id . ' ' . var_export( $website_last_themes ) );
-
 				$website_themes = json_decode( $website->theme_upgrades, true );
-				MainWPLogger::Instance()->info( 'CRON :: website theme upgrades for' . $website->id . ' ' . var_export( $website_themes ) );
-
 				$decoded_premium_upgrades = json_decode( MainWPDB::Instance()->getWebsiteOption( $website, 'premium_upgrades' ), true );
-				MainWPLogger::Instance()->info( 'CRON :: website premium upgrades for ' . $website->id . ' ' . var_export( $decoded_premium_upgrades ) );
 
 				// Add premium upgrades to the list of themes and plugins.
 				if ( is_array( $decoded_premium_upgrades ) ) {
-					MainWPLogger::Instance()->info( 'CRON :: before we start looping on premium upgrades' );
-
 					foreach ( $decoded_premium_upgrades as $slug => $premium_upgrade ) {
 						if ( 'plugin' === $premium_upgrade['type'] ) {
 							if ( ! is_array( $website_plugins ) ) {
@@ -565,112 +448,34 @@ class BAUFM_Updater {
 
 				MainWPUtility::update_option( 'mainwp_updatescheck_mail_email', $email );
 
-				MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, array( 'dtsAutomaticSync' => time() ) );
+				MainWPDB::Instance()->updateWebsiteSyncValues( $website->id, array( 'dtsAutomaticSync' => 0 ) );
 				MainWPDB::Instance()->updateWebsiteOption( $website, 'last_wp_upgrades', json_encode( $website_core_upgrades ) );
 				MainWPDB::Instance()->updateWebsiteOption( $website, 'last_plugin_upgrades', $website->plugin_upgrades );
 				MainWPDB::Instance()->updateWebsiteOption( $website, 'last_theme_upgrades', $website->theme_upgrades );
 			}
 
-			if ( count( $core_new_update ) != 0 ) {
-				$core_new_update_saved = get_option( "mainwp_updatescheck_mail_update_core_new_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_core_new_$group_id", MainWPUtility::array_merge( $core_new_update_saved, $core_new_update ) );
-			}
-
-			if ( count( $plugins_new_update ) != 0 ) {
-				$plugins_new_update_saved = get_option( "mainwp_updatescheck_mail_update_plugins_new_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_plugins_new_$group_id", MainWPUtility::array_merge( $plugins_new_update_saved, $plugins_new_update ) );
-			}
-
-			if ( count( $themes_new_update ) != 0 ) {
-				$themes_new_update_saved = get_option( "mainwp_updatescheck_mail_update_themes_new_$group_id" );
-				MainWPUtility::update_option( 'mainwp_updatescheck_mail_update_themes_new_$group_id', MainWPUtility::array_merge( $themes_new_update_saved, $themes_new_update ) );
-			}
-
-			if ( count( $core_to_update ) != 0 ) {
-				$core_to_update_saved = get_option( "mainwp_updatescheck_mail_update_core_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_core_$group_id", MainWPUtility::array_merge( $core_to_update_saved, $core_to_update ) );
-			}
-
-			if ( count( $plugins_to_update ) != 0 ) {
-				$plugins_to_update_saved = get_option( "mainwp_updatescheck_mail_update_plugins_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_plugins_$group_id", MainWPUtility::array_merge( $plugins_to_update_saved, $plugins_to_update ) );
-			}
-
-			if ( count( $themes_to_update ) != 0 ) {
-				$themes_to_update_saved = get_option( "mainwp_updatescheck_mail_update_themes_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_update_themes_$group_id", MainWPUtility::array_merge( $themes_to_update_saved, $themes_to_update ) );
-			}
-
-			if ( count( $ignored_core_to_update ) != 0 ) {
-				$ignored_core_to_update_saved = get_option( "mainwp_updatescheck_mail_ignore_core_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_core_$group_id", MainWPUtility::array_merge( $ignored_core_to_update_saved, $ignored_core_to_update ) );
-			}
-
-			if ( count( $ignored_core_new_update ) != 0 ) {
-				$ignored_core_new_update_saved = get_option( "mainwp_updatescheck_mail_ignore_core_new_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_core_new_$group_id", MainWPUtility::array_merge( $ignored_core_new_update_saved, $ignored_core_new_update ) );
-			}
-
-			if ( count( $ignored_plugins_to_update ) != 0 ) {
-				$ignored_plugins_to_update_saved = get_option( "mainwp_updatescheck_mail_ignore_plugins_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_plugins_$group_id", MainWPUtility::array_merge( $ignored_plugins_to_update_saved, $ignored_plugins_to_update ) );
-			}
-
-			if ( count( $ignored_plugins_new_update ) != 0 ) {
-				$ignored_plugins_new_update_saved = get_option( "mainwp_updatescheck_mail_ignore_plugins_new_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_plugins_new_$group_id", MainWPUtility::array_merge( $ignored_plugins_new_update_saved, $ignored_plugins_new_update ) );
-			}
-
-			if ( count( $ignored_themes_to_update ) != 0 ) {
-				$ignored_themes_to_update_saved = get_option( "mainwp_updatescheck_mail_ignore_themes_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_themes_$group_id", MainWPUtility::array_merge( $ignored_themes_to_update_saved, $ignored_themes_to_update ) );
-			}
-
-			if ( count( $ignored_themes_new_update ) != 0 ) {
-				$ignored_themes_new_updateSaved = get_option( "mainwp_updatescheck_mail_ignore_themes_new_$group_id" );
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_ignore_themes_new_$group_id", MainWPUtility::array_merge( $ignored_themes_new_updateSaved, $ignored_themes_new_update ) );
-			}
-
-			if ( '' != $plugin_conflicts ) {
-				$plugin_conflicts_saved = get_option( "mainwp_updatescheck_mail_pluginconflicts_$group_id" );
-
-				if ( false == $plugin_conflicts_saved ) {
-					$plugin_conflicts_saved = '';
-				}
-
-				MainWPUtility::update_option( "mainwp_updatescheck_mail_pluginconflicts_$group_id", $plugin_conflicts_saved . $plugin_conflicts );
-			}
-
-			if ( '' != $theme_conflicts ) {
-				$theme_conflicts_saved = get_option( "mainwp_updatescheck_mail_themeconflicts_$group_id" );
-
-				if ( false == $theme_conflicts_saved ) {
-					$theme_conflicts_saved = '';
-				}
-
-				MainWPUtility::update_option( 'mainwp_updatescheck_mail_themeconflicts_$group_id', $theme_conflicts_saved . $theme_conflicts );
-			}
+			MainWPLogger::Instance()->info( 'CRON :: Exiting loop on current group.' );
 
 			if ( ( 0 == count( $core_to_update ) ) && ( 0 == count( $plugins_to_update ) ) && ( 0 == count( $themes_to_update ) ) && ( 0 == count( $ignored_core_to_update ) )  && ( 0 == count( $ignored_core_new_update ) ) && ( 0 == count( $ignored_plugins_to_update ) ) && ( 0 == count( $ignored_plugins_new_update ) ) && ( 0 == count( $ignored_themes_to_update ) ) && ( 0 == count( $ignored_themes_new_update ) ) && ( '' == $plugin_conflicts ) && ( '' == $theme_conflicts ) ) {
+				MainWPLogger::Instance()->info( 'CRON :: We have no updates.' );
 				return;
 			}
 
-			if ( in_array( $do_what_for_group, array( 0, 1 ) ) ) {
-				MainWPLogger::Instance()->info( 'CRON :: we are not installing updates, exit' );
+			MainWPLogger::Instance()->info( 'CRON :: We have updates.' );
+
+			if ( in_array( $action, array( 0, 1 ) ) ) {
+				MainWPLogger::Instance()->info( 'CRON :: We are not updating.' );
 				return;
 			}
-
-			MainWPLogger::Instance()->info( 'CRON :: looks like we will be installing updates' );
 
 			// Check if backups are required!
 			if ( 1 == get_option( 'mainwp_backup_before_upgrade' ) ) {
 
-				MainWPLogger::Instance()->info( 'CRON :: checking backups before upgrade' );
+				MainWPLogger::Instance()->info( 'CRON :: Backups are required.' );
 
-				$sites_check_completed = get_option( "mainwp_automaticUpdate_backupChecks_$group_id" );
+				$sites_check_completed = get_option( "mainwp_automaticUpdate_backup_checks_$group_id" );
 
 				if ( ! is_array( $sites_check_completed ) ) {
-					MainWPLogger::Instance()->info( 'CRON :: site check not completed' );
 					$sites_check_completed = array();
 				}
 
@@ -718,7 +523,7 @@ class BAUFM_Updater {
 
 					if ( ! $backupRequired ) {
 						$sites_check_completed[ $siteId ] = true;
-						MainWPUtility::update_option( "mainwp_automaticUpdate_backupChecks_$group_id", $sites_check_completed );
+						MainWPUtility::update_option( "mainwp_automaticUpdate_backup_checks_$group_id", $sites_check_completed );
 						continue;
 					}
 
@@ -726,14 +531,13 @@ class BAUFM_Updater {
 						$result = MainWPManageSites::backup( $siteId, 'full', '', '', 0, 0, 0, 0 );
 						MainWPManageSites::backupDownloadFile( $siteId, 'full', $result['url'], $result['local'] );
 						$sites_check_completed[ $siteId ] = true;
-						MainWPUtility::update_option( "mainwp_automaticUpdate_backupChecks_$group_id", $sites_check_completed );
+						MainWPUtility::update_option( "mainwp_automaticUpdate_backup_checks_$group_id", $sites_check_completed );
 					} catch ( Exception $e ) {
 						$sites_check_completed[ $siteId ] = false;
-						MainWPUtility::update_option( "mainwp_automaticUpdate_backupChecks_$group_id", $sites_check_completed );
+						MainWPUtility::update_option( "mainwp_automaticUpdate_backup_checks_$group_id", $sites_check_completed );
 					}
 				}
 			} else {
-				MainWPLogger::Instance()->info( 'CRON :: no backups checks needed before upgrade for ' . $siteId );
 				$sites_check_completed = null;
 			}
 
@@ -742,13 +546,13 @@ class BAUFM_Updater {
 
 				// Skip if site check is not completed.
 				if ( ( null != $sites_check_completed ) && ( false == $sites_check_completed[ $websiteId ] ) ) {
-					MainWPLogger::Instance()->info( 'CRON :: skipping plugin updates ' . var_export( $slugs ) . ' for ' . $websiteId );
 					continue;
 				}
 
+				MainWPLogger::Instance()->info( 'CRON :: Looping for plugin updates.' );
+
 				// Let's do it!
 				try {
-					MainWPLogger::Instance()->info( 'CRON :: updating plugins ' . var_export( $slugs ) . ' for ' . $websiteId );
 
 					MainWPUtility::fetchUrlAuthed( $all_websites[ $websiteId ], 'upgradeplugintheme', array(
 						'type' => 'plugin',
@@ -757,7 +561,6 @@ class BAUFM_Updater {
 
 					if ( isset( $information['sync'] ) && ! empty( $information['sync'] ) ) { MainWPSync::syncInformationArray( $all_websites[ $websiteId ], $information['sync'] ); }
 				} catch ( Exception $e ) {
-					MainWPLogger::Instance()->info( 'CRON :: failed plugin updates ' . var_export( $slugs ) . ' for ' . $websiteId );
 				}
 			}
 
@@ -766,13 +569,11 @@ class BAUFM_Updater {
 
 				// Skip if site check is not completed.
 				if ( ( null != $sites_check_completed ) && ( false == $sites_check_completed[ $websiteId ] ) ) {
-					MainWPLogger::Instance()->info( 'CRON :: skipping theme updates ' . var_export( $slugs ) . ' for ' . $websiteId );
 					continue;
 				}
 
 				// Let's do it!
 				try {
-					MainWPLogger::Instance()->info( 'CRON :: updating themes ' . var_export( $slugs ) . ' for ' . $websiteId );
 
 					MainWPUtility::fetchUrlAuthed( $all_websites[ $websiteId ] , 'upgradeplugintheme', array(
 						'type' => 'theme',
@@ -783,7 +584,6 @@ class BAUFM_Updater {
 						MainWPSync::syncInformationArray( $all_websites[ $websiteId ], $information['sync'] );
 					}
 				} catch ( Exception $e ) {
-					MainWPLogger::Instance()->info( 'CRON :: failed theme updates ' . var_export( $slugs ) . ' for ' . $websiteId );
 				}
 			}
 
@@ -791,39 +591,49 @@ class BAUFM_Updater {
 			foreach ( $core_to_update_now as $websiteId ) {
 
 				if ( ( null != $sites_check_completed ) && ( false == $sites_check_completed[ $websiteId ] ) ) {
-					MainWPLogger::Instance()->info( 'CRON :: skipping core updates for ' . $websiteId );
 					continue;
 				}
 
 				// Let's do it!
 				try {
 					MainWPUtility::fetchUrlAuthed( $all_websites[ $websiteId ], 'upgrade' );
-					MainWPLogger::Instance()->info( 'CRON :: doing core updates for ' . $websiteId );
 				} catch ( Exception $e ) {
-					MainWPLogger::Instance()->info( 'CRON :: failed core updates for ' . $websiteId );
 				}
 			}
 
-			$this->set_last_scheduled_update_for_group( $group_id, time() );
+			BAUFM_Schedules::set_group_last_scheduled_update( $group_id, time() );
 
 	        do_action( 'baufm_cronupdatecheck_action', $plugins_new_update, $plugins_to_update, $plugins_to_update_now, $themes_new_update, $themes_to_update, $themes_to_update_now, $core_new_update, $core_to_update, $core_to_update_now );
-		}
 	}
 
-	public function print_updates_array_lines( $array, $backupChecks ) {
+	/**
+	 * @since 0.2.0
+	 */
+	public function print_updates_array_lines( $array, $backup_checks ) {
 		$output = '';
 
 		foreach ( $array as $line ) {
-			$siteId      = $line[0];
-			$text        = $line[1];
-			$trustedText = $line[2];
+			$siteId       = $line[0];
+			$text         = $line[1];
+			$trusted_text = $line[2];
 
-			$output .= '<li>' . $text . $trustedText . ( null == $backupChecks || ! isset( $backupChecks[ $siteId ] ) || ( true == $backupChecks[ $siteId ] ) ? '' : '(Requires manual backup)' ) . '</li>'."\n";
+			$output .= '<li>';
+			$output	.= $text;
+			$output .= $trusted_text;
+
+			if ( ! ( null === $backup_checks || ! isset( $backup_checks[ $siteId ] ) || ( true === $backup_checks[ $siteId ] ) ) ) {
+				$ouput .= esc_html__( '(Requires manual backup)', 'baufm' );
+			}
+
+			$output .= "</li>\n";
 		}
 
 		return $output;
 	}
 
+	/**
+	 * @since 0.2.0
+	 */
 	public function get_group_by_site_id( $site_id ) {
 		global $wpdb;
 
@@ -832,9 +642,7 @@ class BAUFM_Updater {
 		}
 
 		$group_ids_obj = $wpdb->get_results( 'SELECT groupid FROM ' . $wpdb->prefix . 'mainwp_wp_group WHERE wpid = ' . $site_id );
-		$group_ids = array();
-
-		MainWPLogger::Instance()->info( 'CRON :: group ids obj is ' . json_encode( $group_ids_obj ) );
+		$group_ids 		 = array();
 
 		foreach ( $group_ids_obj as $group ) {
 			$group_ids[] = $group->groupid;
@@ -843,9 +651,13 @@ class BAUFM_Updater {
 		return $group_ids;
 	}
 
+	/**
+	 * @since 0.2.0
+	 */
 	public function parse_init() {
+		// Reuse old value 'cronUpdatesCheck' for compatibilty with our override.
 		if ( isset( $_GET['do'] ) && 'cronUpdatesCheck' == $_GET['do'] ) {
-			$this->baufm_updater_cron_updates_check_action();
+			$this->check_for_updates();
 		}
 	}
 }

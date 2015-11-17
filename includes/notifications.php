@@ -64,6 +64,8 @@ function baufm_send_emails_after_update( $pluginsNewUpdate, $pluginsToUpdate, $p
 		$website = MainWPDB::Instance()->getWebsiteById( $website_id );
 
 		$template_model->site_url = $website->url;
+		$template_model->staging_site_url = $website->url;
+		$template_model->production_site_url = $website->url;
 
 		MainWPLogger::Instance()->info( 'Website ID : ' . $website_id );
 

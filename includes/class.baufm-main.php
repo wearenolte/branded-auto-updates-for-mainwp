@@ -20,6 +20,7 @@ class BAUFM_Main {
 	 * @since 0.1.0
 	 */
 	public static function init() {
+			global $baufm_updater;
 
 	    // ALWAYS make sure the plugin version is up-to-date.
 	    update_option( 'baufm_plugin_version', BAUFM_PLUGIN_VERSION );
@@ -31,6 +32,7 @@ class BAUFM_Main {
 	    add_option( 'baufm_config_template_id', '' );
 
 	    wp_clear_scheduled_hook( 'mainwp_cronupdatescheck_action' );
+
 	    $baufm_updater = new BAUFM_Updater();
 
 	    ob_start();
@@ -54,7 +56,11 @@ class BAUFM_Main {
 
 			deactivate_plugins( BAUFM_PLUGIN_NAME );
 
-		  	$message = sprintf( __( 'Branded Auto Updates for MainWP %s requires WordPress %s or higher.', 'baufm' ), BAUFM_PLUGIN_VERSION, BAUFM_MIN_WP_VERSION );
+			$message = sprintf(
+				__( 'Branded Auto Updates for MainWP %s requires WordPress %s or higher.', 'baufm' ),
+				BAUFM_PLUGIN_VERSION,
+				BAUFM_MIN_WP_VERSION
+			);
 
 	  		wp_die( $message );
 		  	exit;

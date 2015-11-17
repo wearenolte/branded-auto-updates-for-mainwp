@@ -11,21 +11,21 @@ if ( ! current_user_can( 'manage_options' ) ) {
 	wp_die( __( 'You do not have sufficient permissions to edit this site.' ) );
 }
 
-$group_id = isset( $_REQUEST['group-id'] ) ? intval( $_REQUEST['group-id'] ) : 0;
-$groups_and_count = MainWPDB::Instance()->getGroupsAndCount();
-$group = $groups_and_count[ $group_id ];
+$group_id 		= isset( $_REQUEST['group-id'] ) ? intval( $_REQUEST['group-id'] ) : 0;
+$groups_and_count	= MainWPDB::Instance()->getGroupsAndCount();
+$group 			= $groups_and_count[ $group_id ];
 
 if ( ! is_numeric( $group_id ) && ! $group_id ) {
 	wp_die( __( 'Invalid site group ID.' ) );
 }
 
-$schedule_in_week = get_option( "baufm_schedule_in_week_group_$group_id" );
-$schedule_in_day  = get_option( "baufm_schedule_in_day_group_$group_id" );
-$sheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
+$schedule_in_week  = get_option( "baufm_schedule_in_week_group_$group_id" );
+$schedule_in_day   = get_option( "baufm_schedule_in_day_group_$group_id" );
+$scheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
 ?>
 
 <form method="get" action="">
-	<?php wp_nonce_field( 'baufm_settings_nonce' ); ?>
+  <?php wp_nonce_field( 'baufm_settings_nonce' ); ?>
 
   <input type="hidden" name="group-id"    value="<?php echo esc_attr( $group_id ); ?>" />
   <input type="hidden" name="page"        value="branded-auto-updates-for-mainwp">
@@ -45,38 +45,24 @@ $sheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
       <th scope="row"><?php _e( 'Batch Schedule' ); ?></th>
       <td>
         <select name="schedule_in_week">
-			<?php
-			$schedule_in_week_values = array(
-			  'Off',
-			  'Everyday',
-			  'Every Sunday',
-			  'Every Monday',
-			  'Every Tuesday',
-			  'Every Wednesday',
-			  'Every Thursday',
-			  'Every Friday',
-			  'Every Saturday',
-			);
-
-			foreach ( $schedule_in_week_values as $index => $day ) {
-				?>
-                <option value="<?php echo esc_attr( $index ); ?>" <?php selected( $index, $schedule_in_week ); ?>><?php esc_html_e( $day ); ?></option>
-				<?php
-			}
-			?>
+	  <?php foreach ( BAUFM_Schedules::get_schedules_text() as $value => $text ) { ?>
+	  <option value="<?php echo esc_attr( $value ); ?>" <?php selected( $value, $schedule_in_week ); ?>>
+	    <?php esc_html_e( $text ); ?>
+	  </option>
+	  <?php } ?>
         </select>
 
         <select name="schedule_in_day">
-			<?php for ( $i = 0; $i < 24; $i++ ) : ?>
-            <?php
-			  $time = baufm_format_scheduled_time_of_day( $i );
-			?>
-            <?php if ( 0 == $i ) : ?>
-              <option value="0" <?php echo selected( $i, $schedule_in_day ); ?>>12:00 <?php echo $suffix; ?></option>
-            <?php else : ?>
-              <option value="<?php echo $time; ?>" <?php echo selected( $i, $schedule_in_day ); ?>><?php echo $time; ?> <?php echo $suffix; ?></option>
-            <?php endif; ?>
-			<?php endfor; ?>
+	  <?php for ( $i = 0; $i < 24; $i++ ) : ?>
+	    <?php $time = baufm_format_scheduled_time_of_day( $i ); ?>
+	    <?php if ( 0 === $i ) : ?>
+	      <option value="0" <?php echo selected( $i, $schedule_in_day ); ?>>12:00 AM</option>
+	      <?php else : ?>
+	      <option value="<?php echo $i; ?>" <?php echo selected( $i, $schedule_in_day ); ?>>
+		<?php echo $time; ?>
+	      </option>
+	    <?php endif; ?>
+	  <?php endfor; ?>
         </select>
 
         <span><?php _e( 'in local time.', 'baufm' ); ?></span>
@@ -110,7 +96,8 @@ $sheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
 		date_default_timezone_set( $tzstring );
 		$now = localtime( time(), true );
 		if ( $now['tm_isdst'] ) {
-			_e( 'This timezone is currently in daylight saving time.' ); } else { 		  _e( 'This timezone is currently in standard time.' ); }
+			_e( 'This timezone is currently in daylight saving time.' );
+		} else { 		  _e( 'This timezone is currently in standard time.' ); }
 		?>
         <br />
         <?php
@@ -149,18 +136,18 @@ $sheduled_action  = get_option( "baufm_scheduled_action_group_$group_id" );
     <tr class="form-field form-required">
       <th scope="row"><?php _e( 'Scheduled Action' ); ?></th>
       <td>
-        <select name="sheduled_action">
+        <select name="scheduled_action">
 			<?php
-			$sheduled_action_list = array(
+			$scheduled_action_list = array(
 			  __( 'Do nothing.', 'baufm' ),
 			  __( 'Just email me when updates are available for review.', 'baufm' ),
 			  __( "Install my trusted updates and then email me when you're done.", 'baufm' ),
 			  __( "Install my trusted updates and but don't notify at all.", 'baufm' ),
 			);
 
-			foreach ( $sheduled_action_list as $value => $text ) {
+			foreach ( $scheduled_action_list as $value => $text ) {
 				?>
-              <option value="<?php esc_attr_e( $value ); ?>"  <?php selected( $sheduled_action, $value ); ?>><?php esc_html_e( $text ); ?></option>
+              <option value="<?php esc_attr_e( $value ); ?>"  <?php selected( $scheduled_action, $value ); ?>><?php esc_html_e( $text ); ?></option>
 				<?php
 			}
 			?>
